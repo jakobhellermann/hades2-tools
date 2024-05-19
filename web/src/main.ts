@@ -24,6 +24,7 @@ onFileselectChange();
 let data: Uint8Array | null;
 
 async function onFileselectChange() {
+  errorText.innerText = "";
   let set = fileselect.files?.[0] != null;
   downloadTextBtn.disabled = !set;
   downloadJsonBtn.disabled = !set;
@@ -59,6 +60,7 @@ function expandSavefile(data: Uint8Array, format: Format): string | null {
 }
 
 async function processSavefile(data: Uint8Array, format: Format) {
+  errorText.innerText = "";
   let expanded = expandSavefile(data, format);
   if (!expanded) return;
 

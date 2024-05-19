@@ -3,7 +3,11 @@ name = "hades2"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+serde = ["dep:serde"]
+
 [dependencies]
 anyhow = "1.0.86"
 lz4_flex = "0.11.3"
 thiserror = "1.0.61"
+serde = { version = "1.0.202", optional = true }

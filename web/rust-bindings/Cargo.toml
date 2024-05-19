@@ -4,7 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-hades2 = { path = "../../crates/hades2" }
+hades2 = { path = "../../crates/hades2", features = ["serde"] }
+serde_json = "1.0.117"
 wasm-bindgen = "0.2.92"
 
 [lib]

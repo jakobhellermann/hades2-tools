@@ -84,3 +84,27 @@ pub fn read_value<'i>(data: &mut &'i [u8]) -> Result<Value<'i>> {
 
     Ok(val)
 }
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for Value<'_> {
+    fn serialize<S>(&self, serializer: S) -> std::prelude::v1::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match *self {
+            Value::Nil => serializer.serialize_none(),
+            Value::Bool(val) => serializer.serialize_bool(val),
+            Value::Number(val) => serializer.serialize_f64(val),
+            Value::String(val) => serializer.serialize_str(val),
+            Value::Table(ref table) => {
+                use serde::ser::SerializeMap;
+                let mut map = serializer.serialize_map(Some(table.len()))?;
+                for (key, val) in table {
+                    map.serialize_entry(key, val)?;
+                }
+
+                map.end()
+            }
+        }
+    }
+}

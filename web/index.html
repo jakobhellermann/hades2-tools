@@ -1,36 +1,50 @@
 <!doctype html>
 <html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Hades II Savefile</title>
+    </head>
 
-<head>
-  <meta charset="UTF-8" />
-  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Hades II Savefile</title>
-</head>
+    <body class="flex relative min-h-screen leading-6">
+        <div id="app" class="flex flex-col gap-4 m-x-auto">
+            <h1>Hades II Savefile Inspector</h1>
 
-<body>
-  <div id="app">
-    <h1>Hades II Savefile Inspector</h1>
+            <p>Savefiles for Hades II are stored in</p>
+            <ul class="list-disc list-inside">
+                <li>
+                    Windows:
+                    <code>Users/User/Saved Games/Hades II/ProfileN.sav</code>
+                </li>
+                <li>
+                    Linux:
+                    <code>
+                        .local/share/Steam/steamapps/compatdata/1145350
+                        <br />
+                        /pfx/drive_c/users/steamuser/Saved Games/Hades II
+                    </code>
+                </li>
+            </ul>
 
-    <p>
-      Savefiles for Hades II are stored in <code>Users/User/Saved Games/Hades II/ProfileN.sav</code>
-    </p>
+            <div class="flex flex-col align-center gap-2 mt-4">
+                <label>
+                    <input type="file" id="fileselect" accept=".sav" />
+                </label>
+                <button id="load-json" disabled>Load (JSON)</button>
+                <button id="download-json" disabled>Download (JSON)</button>
+                <button id="download-text" disabled>Download (Text)</button>
 
+                <div id="viewer" />
+            </div>
 
-    <input type="file" id="fileselect" accept=".sav">
+            <p id="error"></p>
+        </div>
 
+        <div id="info" class="absolute left-1 bottom-1">
+            <a href="https://github.com/jakobhellermann/hades2-tools" target="_blank">https://github.com/jakobhellermann/hades2-tools</a>
+        </div>
 
-    <p id="error"></p>
-
-  </div>
-
-
-  <div id="info">
-    <a href="https://github.com/jakobhellermann/hades2-tools"
-      target="_blank">https://github.com/jakobhellermann/hades2-tools</a>
-  </div>
-
-  <script type="module" src="/src/main.ts"></script>
-</body>
-
+        <script type="module" src="/src/main.ts"></script>
+    </body>
 </html>

@@ -30,14 +30,14 @@ body {
   justify-content: center;
   min-width: 320px;
   min-height: 100vh;
+
+  position: relative;
 }
 
 h1 {
   font-size: 3.2em;
   line-height: 1.1;
 }
-
-
 
 button {
   border-radius: 8px;
@@ -83,4 +83,10 @@ button:focus-visible {
 
 #error {
   color: #ff3333;
+}
+
+#info {
+  position: absolute;
+  left: 0.25rem;
+  bottom: 0.25rem;
 }

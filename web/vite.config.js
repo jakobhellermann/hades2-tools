@@ -6,5 +6,6 @@ export default defineConfig({
     plugins: [
         wasm(),
         topLevelAwait()
-    ]
+    ],
+    base: "/hades2-tools"
 });

@@ -1,0 +1,11 @@
+[package]
+name = "hades2-bindings"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+hades2 = { path = "../../crates/hades2" }
+wasm-bindgen = "0.2.92"
+
+[lib]
+crate-type = ["cdylib"]

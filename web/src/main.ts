@@ -10,10 +10,13 @@ let downloadJsonBtn = document.getElementById("download-json") as HTMLButtonElem
 let loadJsonBtn = document.getElementById("load-json") as HTMLButtonElement;
 
 let viewer = document.getElementById("viewer")!;
+let viewerControls = document.getElementById("viewer-controls")!;
+let viewerControlExpand = document.getElementById("viewer-control-expand")!;
 
 downloadTextBtn.addEventListener("click", () => data && processSavefile(data, "text"));
 downloadJsonBtn.addEventListener("click", () => data && processSavefile(data, "json-pretty"));
 loadJsonBtn.addEventListener("click", () => data && loadJson(data));
+viewerControlExpand.addEventListener("click", toggleExpandAll);
 
 type Format = "json" | "json-pretty" | "text";
 
@@ -73,10 +76,25 @@ async function processSavefile(data: Uint8Array, format: Format) {
   link.remove();
 }
 
+let tree: jsonview.Tree;
+let expanded = false;
 function loadJson(data: Uint8Array) {
   let json = expandSavefile(data, "json");
   if (!json) return;
 
-  let tree = jsonview.create(json);
+  tree = jsonview.create(json);
   jsonview.render(tree, viewer);
+  jsonview.toggleNode(tree);
+  viewerControls.hidden = !viewerControls.hidden;
+}
+
+function toggleExpandAll() {
+  if (expanded) {
+    jsonview.collapse(tree);
+    jsonview.toggleNode(tree);
+  } else {
+    jsonview.expand(tree);
+  }
+  expanded = !expanded;
+  viewerControlExpand.innerText = expanded ? "Collapse all" : "Expand all";
 }

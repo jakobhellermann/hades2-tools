@@ -35,7 +35,11 @@
                 <button id="download-json" disabled>Download (JSON)</button>
                 <button id="download-text" disabled>Download (Text)</button>
 
-                <div id="viewer" />
+                <div id="viewer" class="relative">
+                    <div class="absolute top-2 right-2" id="viewer-controls" hidden>
+                        <button class="p-1 text-sm" id="viewer-control-expand">Expand All</button>
+                    </div>
+                </div>
             </div>
 
             <p id="error"></p>

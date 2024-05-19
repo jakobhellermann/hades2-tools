@@ -64,5 +64,5 @@ button:focus-visible {
 .json-container {
     padding: 0.25rem;
     border-radius: 4px;
-    background: #111;
+    background: #111 !important;
 }

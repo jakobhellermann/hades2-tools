@@ -1,6 +1,6 @@
 # hades2-tools
 
-[Savefile Inspector](https://jakobhellermann.github.io/hades2-tools)
+[Savefile Explorer](https://jakobhellermann.github.io/hades2-tools)
 
 
 ## Repo
@@ -8,7 +8,7 @@
 Rust code for working with Hades II savefiles
 
 ### `web`
-Web page deployed with github pages with a savefile inspector
+Web page deployed with github pages with a savefile explorer
 
 ```sh
 cd web

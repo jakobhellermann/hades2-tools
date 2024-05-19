@@ -1,4 +1,3 @@
-// @ts-ignore
 import jsonview from "@pgrabovets/json-view";
 import * as hades2 from "../rust-bindings/out/hades2_bindings.js";
 import "./style.css";

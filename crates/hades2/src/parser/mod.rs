@@ -14,7 +14,7 @@ pub enum Error {
     UnexpectedAtEnd,
     #[error("could not decode utf-8")]
     UTF8(std::str::Utf8Error),
-    #[error("failed to decompress")]
+    #[error("failed to decompress: {0}")]
     LZ4(#[from] lz4_flex::block::DecompressError),
 
     #[error("unexpected lua state")]
@@ -50,6 +50,7 @@ pub fn read_u32(data: &mut &[u8]) -> Result<u32> {
     let bytes = read_bytes_array::<4>(data)?;
     Ok(u32::from_le_bytes(bytes))
 }
+#[allow(unused)]
 pub fn read_u64(data: &mut &[u8]) -> Result<u64> {
     let bytes = read_bytes_array::<8>(data)?;
     Ok(u64::from_le_bytes(bytes))

@@ -11,9 +11,8 @@ extern "C" {
 
 #[wasm_bindgen]
 pub fn expand_savefile(data: &[u8], format: &str) -> Result<String, JsError> {
-    let savefile = hades2::parse(data)?;
-    let lua_state = savefile.decompress_lua_state()?;
-    let state = hades2::parse_lua_state(&lua_state)?;
+    let savefile = hades2::saves::Savefile::parse(data)?;
+    let state = savefile.parse_lua_state()?;
 
     let text = match format {
         "text" => format!("{:#?}", state),

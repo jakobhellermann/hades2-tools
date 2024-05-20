@@ -1,17 +1,14 @@
 use anyhow::Result;
-use hades2::parse;
-use std::path::Path;
+use hades2::Hades2Installation;
 
 fn main() -> Result<()> {
-    let dir = Path::new("C:/Users/Jakob/Saved Games/Hades II");
+    let hades = Hades2Installation::detect()?;
 
-    // let profiles = ["Profile1.sav", "Profile2.sav"];
-    let profiles = ["Profile1.sav"];
-    for profile in profiles {
-        let profile = dir.join(profile);
-
-        let bytes = std::fs::read(profile)?;
-        parse(&mut &*bytes)?;
+    for save in [2] {
+        let save = hades.save(save)?;
+        dbg!(&save);
+        let lua = save.parse_lua_state()?;
+        println!("{}...", &format!("{lua:?}")[..100]);
     }
 
     Ok(())

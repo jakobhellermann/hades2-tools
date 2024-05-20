@@ -1,75 +1,94 @@
-#![allow(unused)]
-
 mod parser;
-use parser::*;
+mod steamlocate;
 
-pub use parser::luabins::Value as LuaValue;
-pub use parser::Result;
+pub mod saves;
 
-pub struct Savefile<'a> {
-    location: &'a str,
-    lua_keys: Vec<&'a str>,
-    lua_state_raw: &'a [u8],
-}
-impl<'a> Savefile<'a> {
-    pub fn decompress_lua_state(&self) -> Result<Vec<u8>, lz4_flex::block::DecompressError> {
-        lz4_flex::block::decompress(self.lua_state_raw, 2994108)
-    }
-}
+pub use anyhow::{Error, Result};
+use std::path::{Path, PathBuf};
 
-pub fn parse_lua_state(mut lua_state: &[u8]) -> Result<LuaValue<'_>> {
-    let lua_state = parser::luabins::read_luabins(&mut lua_state)?;
-    if lua_state.len() != 1 {
-        return Err(Error::LuaError);
-    }
-
-    let value = lua_state.into_iter().next().unwrap();
-
-    Ok(value)
+#[allow(unused)]
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum LocateError {
+    #[error("platform not supported")]
+    UnsupportedPlatform,
+    #[error("directory was not found")]
+    NotFound,
+    #[error("error trying to find directory")]
+    Other,
 }
 
-pub fn parse(mut data: &[u8]) -> Result<Savefile<'_>> {
-    parse_inner(&mut data)
+#[derive(Debug, Clone)]
+pub struct Hades2Installation {
+    #[allow(unused)]
+    steam_dir: PathBuf,
+    save_dir: PathBuf,
 }
-fn parse_inner<'i>(data: &mut &'i [u8]) -> Result<Savefile<'i>> {
-    let signature = read_bytes_array::<4>(data)?;
-    if signature != [0x53, 0x47, 0x42, 0x31] {
-        return Err(Error::SignatureMismatch);
+impl Hades2Installation {
+    pub fn steam_dir(&self) -> &Path {
+        &self.steam_dir
+    }
+    pub fn save_dir(&self) -> &Path {
+        &self.save_dir
     }
 
-    let _checksum = read_bytes_array::<4>(data);
-    let version = read_u32(data)?;
-    if version != 17 {
-        return Err(Error::UnsupportedVersion(version));
+    pub fn detect() -> Result<Self> {
+        let steam_dir = crate::steamlocate::locate_steam_dir()?;
+        let save_dir = saves::save_dir(&steam_dir)?;
+
+        Ok(Hades2Installation {
+            steam_dir,
+            save_dir,
+        })
     }
 
-    let _a = read_u32(data)?;
-    let _b = read_u32(data)?;
+    pub fn save(&self, slot: u32) -> Result<saves::Savefile> {
+        let file = self.save_dir.join(format!("Profile{slot}.sav"));
+        let data = std::fs::read(file)?;
+        let savefile = saves::Savefile::parse(&data)?;
+        Ok(savefile)
+    }
+    pub fn saves(&self) -> Result<Vec<SaveHandle>> {
+        let mut saves = Vec::new();
+        for save in self.save_dir.read_dir()? {
+            if let Some(handle) = SaveHandle::from_path(save?.path()) {
+                saves.push(handle);
+            }
+        }
 
-    let location = read_str_prefix(data)?;
-    let unk_1 = read_u32(data)?;
-    let unk_2 = read_u32(data)?; // runs?
-    let unk_3 = read_u32(data)?; // meta points?
-    let unk_4 = read_u32(data)?; // shrine points?
-    let unk_5 = read_u8(data)?; // god mode?
-    let unk_6 = read_u8(data)?; // hell mode?
-                                // dbg!(unk_1, unk_2, unk_3, unk_4, unk_5, unk_6,);
+        Ok(saves)
+    }
+}
 
-    let lua_keys = read_array(data, read_str_prefix)?;
+#[derive(Clone, Debug)]
+pub struct SaveHandle(PathBuf, u32);
+impl SaveHandle {
+    pub fn from_path(path: PathBuf) -> Option<Self> {
+        let i = path
+            .file_name()?
+            .to_str()?
+            .strip_suffix(".sav")?
+            .strip_prefix("Profile")?
+            .parse()
+            .ok()?;
 
-    let current_map_name = read_str_prefix(data)?;
-    let start_next_map = read_str_prefix(data)?;
-
-    let length = read_u32(data)?;
-    let lua_state = read_bytes(data, length as usize)?;
-
-    if data.len() > 0 {
-        return Err(Error::UnexpectedAtEnd);
+        Some(SaveHandle(path, i))
     }
 
-    Ok(Savefile {
-        location,
-        lua_keys,
-        lua_state_raw: lua_state,
-    })
+    pub fn slot(&self) -> u32 {
+        self.1
+    }
+    pub fn path(&self) -> &Path {
+        &self.0
+    }
+    pub fn read(&self) -> Result<saves::Savefile> {
+        let data = std::fs::read(&self.0)?;
+        let savefile = saves::Savefile::parse(&data)?;
+        Ok(savefile)
+    }
+
+    pub fn read_header_only(&self) -> Result<saves::Savefile> {
+        let data = std::fs::read(&self.0)?;
+        let savefile = saves::Savefile::parse_header_only(&data)?;
+        Ok(savefile)
+    }
 }

@@ -1,0 +1,12 @@
+[package]
+name = "hades2-savefile-editor"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+hades2 = { version = "0.1", path = "../hades2" }
+iced = { version = "0.12", features = ["debug", "tokio"] }
+rfd = { version = "0.14", default-features = false, features = [
+    "xdg-portal",
+    "tokio",
+] }

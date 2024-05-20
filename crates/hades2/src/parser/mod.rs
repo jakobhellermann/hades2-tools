@@ -46,11 +46,14 @@ pub fn read_u8(data: &mut &[u8]) -> Result<u8> {
     Ok(*first)
 }
 
+pub fn read_bool(data: &mut &[u8]) -> Result<bool> {
+    let val = read_u8(data)?;
+    Ok(val != 0)
+}
 pub fn read_u32(data: &mut &[u8]) -> Result<u32> {
     let bytes = read_bytes_array::<4>(data)?;
     Ok(u32::from_le_bytes(bytes))
 }
-#[allow(unused)]
 pub fn read_u64(data: &mut &[u8]) -> Result<u64> {
     let bytes = read_bytes_array::<8>(data)?;
     Ok(u64::from_le_bytes(bytes))

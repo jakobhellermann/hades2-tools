@@ -184,7 +184,8 @@ impl Application for SavefileEditor {
                 ))];
 
                 if self.advanced_mode {
-                    page = page.push(text(&format!("{state:#?}")[..500]));
+                    page = page.push(text(&format!("{save:#?}")));
+                    page = page.push(text(&format!("{state:#?}")[..5000]));
                 } else {
                     page = page.push(text("easy"));
                 }

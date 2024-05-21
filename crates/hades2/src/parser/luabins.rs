@@ -69,7 +69,6 @@ impl Value<'_> {
         }
     }
     pub fn visit(&self, include_keys: bool, f: &mut impl FnMut(&Value<'_>)) {
-        f(self);
         match self {
             Value::Nil => {}
             Value::Bool(_) => {}
@@ -84,6 +83,7 @@ impl Value<'_> {
                 }
             }
         }
+        f(self);
     }
 
     pub fn count(&self, include_keys: bool, f: &mut impl FnMut(&Value<'_>) -> bool) -> usize {
@@ -146,12 +146,26 @@ pub fn read_value<'i>(data: &mut &'i [u8]) -> Result<Value<'static>> {
                 pairs.push((key, val));
             }
 
-            pairs.sort_by(|(a, _), (b, _)| a.cmp(b));
+            // pairs.sort_by(|(a, _), (b, _)| a.cmp(b));
 
             Value::Table(pairs)
         }
         _ => return Err(Error::LuaError),
     };
+
+    /*let mut result = Vec::new();
+    write::save_value(&mut result, &val);
+    let same = result.as_slice() == &datacopy[..result.len()];
+    if !same {
+        let count = val.count(true, &mut |_| true);
+        dbg!(count);
+        if [3, 9, 13, 15].contains(&count) {
+            dbg!(&val);
+            std::fs::write("a", result.as_slice()).unwrap();
+            std::fs::write("b", &datacopy[..result.len()]).unwrap();
+            panic!();
+        }
+    }*/
 
     Ok(val)
 }
@@ -176,6 +190,114 @@ impl serde::Serialize for Value<'_> {
 
                 map.end()
             }
+        }
+    }
+}
+
+pub use write::write_luabins;
+
+// from https://github.com/TannerRogalsky/luabins/blob/306510abeaec25784b606039202de4d88c72f48b/src/lib.rs#L172C1-L258C2 (MIT)
+// since I already have my own parser without nom
+pub mod write {
+    use super::Value;
+
+    fn save_table(result: &mut Vec<u8>, table: &[(Value, Value)]) {
+        // The canonical implementation of this function is here
+        // https://github.com/lua/lua/blob/ad3942adba574c9d008c99ce2785a5af19d146bf/ltable.c#L889-L966
+        fn array_size(table: &[(Value, Value)]) -> usize {
+            let mut size = 0;
+
+            for index in 1..=table.len() {
+                let v = table.iter().find(|(key, _value)| match *key {
+                    Value::Number(num) => index == num as usize,
+                    _ => false,
+                });
+                if v.is_some() {
+                    size = index;
+                } else {
+                    break;
+                }
+            }
+            size
+        }
+
+        const USE_HADES_VERSION: bool = false;
+
+        let (array_size, hash_size) = if USE_HADES_VERSION {
+            let mut n_number = 0;
+
+            let mut last_index = 0.0;
+            let mut started_hashes = false;
+            let mut is_consecutive = true;
+
+            for (key, _) in table {
+                match *key {
+                    Value::Number(i) => {
+                        if last_index == 0.0 && i != 1.0 {
+                            is_consecutive = false;
+                        }
+
+                        is_consecutive &= !started_hashes;
+                        is_consecutive &= i > last_index;
+                        last_index = i;
+
+                        n_number += 1;
+                    }
+                    _ if !started_hashes => started_hashes = true,
+                    _ => {}
+                }
+            }
+
+            if is_consecutive {
+                (n_number, table.len() - n_number)
+            } else {
+                (0, table.len())
+            }
+        } else {
+            let array = array_size(table);
+            let hash_size = table.len() - array;
+
+            (array, hash_size)
+        };
+
+        result.push(b'T');
+        result.extend_from_slice(&((array_size as u32).to_le_bytes()));
+        result.extend_from_slice(&((hash_size as u32).to_le_bytes()));
+
+        // TODO: validate nesting depth
+        for (key, value) in table {
+            save_value(result, key);
+            save_value(result, value);
+        }
+    }
+
+    fn save_value(result: &mut Vec<u8>, value: &Value) {
+        match value {
+            Value::Nil => result.push(b'-'),
+            Value::Bool(inner) => match *inner {
+                false => result.push(b'0'),
+                true => result.push(b'1'),
+            },
+            Value::Number(inner) => {
+                result.push(b'N');
+                result.extend_from_slice(&inner.to_le_bytes());
+            }
+            Value::String(inner) => {
+                result.push(b'S');
+                result.extend_from_slice(&(inner.len() as u32).to_le_bytes());
+                result.extend_from_slice(inner.as_bytes());
+            }
+            Value::Table(table) => save_table(result, table),
+        }
+    }
+
+    pub fn write_luabins<'a>(
+        result: &mut Vec<u8>,
+        data: impl Iterator<Item = &'a Value<'a>> + ExactSizeIterator,
+    ) {
+        result.push(data.len() as u8);
+        for datum in data {
+            save_value(result, datum);
         }
     }
 }

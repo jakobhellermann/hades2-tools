@@ -1,6 +1,9 @@
 use crate::LocateError;
 use std::path::{Path, PathBuf};
 
+const MAGIC: [u8; 4] = [0x53, 0x47, 0x42, 0x31];
+const LZ4_MIN_DECOPMRESS_LEN: usize = 15679488;
+
 #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
 pub(crate) fn save_dir(_steam_dir: &Path) -> Result<PathBuf, LocateError> {
     Err(LocateError::UnsupportedPlatform)
@@ -40,7 +43,7 @@ pub use crate::parser::luabins::Value as LuaValue;
 pub use crate::parser::Result;
 use crate::parser::*;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Savefile {
     pub location: String,
     pub checksum: u32,
@@ -61,7 +64,7 @@ impl Savefile {
         let computed_checksum = adler32::RollingAdler32::from_buffer(&data[8..]).hash();
 
         let (savefile, lua_state) = parse_inner(&mut data)?;
-        let lua_state = lz4_flex::block::decompress(lua_state, 15679488)?;
+        let lua_state = lz4_flex::block::decompress(lua_state, LZ4_MIN_DECOPMRESS_LEN)?;
 
         let lua_state = luabins::read_luabins(&mut lua_state.as_slice())?;
         if lua_state.len() != 1 {
@@ -84,7 +87,7 @@ impl Savefile {
 
 fn parse_inner<'i>(data: &mut &'i [u8]) -> Result<(Savefile, &'i [u8])> {
     let signature = read_bytes_array::<4>(data)?;
-    if signature != [0x53, 0x47, 0x42, 0x31] {
+    if signature != MAGIC {
         return Err(Error::SignatureMismatch);
     }
 
@@ -96,7 +99,7 @@ fn parse_inner<'i>(data: &mut &'i [u8]) -> Result<(Savefile, &'i [u8])> {
     }
     let timestamp = read_u64(data)?;
     let location = read_str_prefix(data)?;
-    let runs = read_u32(data)? + 1;
+    let runs = read_u32(data)?;
     let accumulated_meta_points = read_u32(data)?;
     let active_shrine_points = read_u32(data)?;
     let grasp = read_u32(data)?;
@@ -133,4 +136,123 @@ fn parse_inner<'i>(data: &mut &'i [u8]) -> Result<(Savefile, &'i [u8])> {
         },
         lua_state,
     ))
+}
+
+impl Savefile {
+    pub fn serialize<W: std::io::Write>(
+        &self,
+        out: W,
+        lua_state: &LuaValue<'_>,
+    ) -> std::io::Result<()> {
+        let mut lua_state_bytes = Vec::new();
+        luabins::write_luabins(&mut lua_state_bytes, std::iter::once(lua_state));
+
+        let compressed = lz4_flex::compress(&lua_state_bytes);
+        serialize_inner(out, self, &compressed)
+    }
+}
+
+fn serialize_inner<W: std::io::Write>(
+    mut out: W,
+    savefile: &Savefile,
+    lua_state_compressed: &[u8],
+) -> std::io::Result<()> {
+    let mut header = Vec::new();
+
+    let version = 17;
+    header.extend_from_slice(&u32::to_le_bytes(version));
+    header.extend_from_slice(&u64::to_le_bytes(savefile.timestamp));
+    header.extend_from_slice(&u32::to_le_bytes(savefile.location.len() as u32));
+    header.extend_from_slice(savefile.location.as_bytes());
+    header.extend_from_slice(&u32::to_le_bytes(savefile.runs));
+    header.extend_from_slice(&u32::to_le_bytes(savefile.accumulated_meta_points));
+    header.extend_from_slice(&u32::to_le_bytes(savefile.active_shrine_points));
+    header.extend_from_slice(&u32::to_le_bytes(savefile.grasp));
+    header.push(savefile.easy_mode as u8);
+    header.push(savefile.hard_mode as u8);
+    header.extend_from_slice(&u32::to_le_bytes(savefile.lua_keys.len() as u32));
+    for key in &savefile.lua_keys {
+        header.extend_from_slice(&u32::to_le_bytes(key.len() as u32));
+        header.extend_from_slice(key.as_bytes());
+    }
+    header.extend_from_slice(&u32::to_le_bytes(savefile.current_map_name.len() as u32));
+    header.extend_from_slice(savefile.current_map_name.as_bytes());
+    header.extend_from_slice(&u32::to_le_bytes(savefile.start_next_map.len() as u32));
+    header.extend_from_slice(savefile.start_next_map.as_bytes());
+    header.extend_from_slice(&u32::to_le_bytes(lua_state_compressed.len() as u32));
+
+    let mut checksum = adler32::RollingAdler32::from_buffer(&header);
+    checksum.update_buffer(lua_state_compressed);
+    let checksum = checksum.hash();
+
+    out.write_all(&MAGIC)?;
+    out.write_all(&u32::to_le_bytes(checksum))?;
+    out.write_all(&header)?;
+    out.write_all(lua_state_compressed)?;
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod test {
+    use anyhow::Result;
+
+    use super::LZ4_MIN_DECOPMRESS_LEN;
+
+    #[test]
+    fn roundtrip_luabins() -> Result<()> {
+        let data = include_bytes!("C:/Users/Jakob/Saved Games/Hades II/Profile1.sav");
+
+        let (_, lua_state) = super::parse_inner(&mut data.as_slice())?;
+        let lua_state_bytes = lz4_flex::block::decompress(lua_state, LZ4_MIN_DECOPMRESS_LEN)?;
+        let lua_state = super::luabins::read_luabins(&mut lua_state_bytes.as_slice())?;
+
+        /*for val in &lua_state {
+            val.visit(true, &mut |val| {
+                let mut result = Vec::new();
+                super::luabins::write::save_value(&mut result, val);
+                let reparsed = super::luabins::read_value(&mut result.as_slice()).unwrap();
+                assert_eq!(*val, reparsed);
+            });
+        }*/
+
+        let mut lua_state_bytes_again = Vec::new();
+        super::luabins::write_luabins(&mut lua_state_bytes_again, lua_state.iter());
+        let reparsed = super::luabins::read_luabins(&mut lua_state_bytes_again.as_slice()).unwrap();
+        assert_eq!(*lua_state, reparsed);
+
+        Ok(())
+    }
+
+    #[test]
+    fn roundtrip_savefile() -> Result<()> {
+        let data = include_bytes!("C:/Users/Jakob/Saved Games/Hades II/Profile1.sav");
+        let (savefile, lua_state_compressed) = super::parse_inner(&mut data.as_slice())?;
+
+        let mut out = Vec::new();
+        super::serialize_inner(&mut out, &savefile, lua_state_compressed)?;
+
+        assert!(out.as_slice() == data);
+
+        Ok(())
+    }
+
+    #[test]
+    fn roundtrip_reparse_savefile() -> Result<()> {
+        let data = include_bytes!("C:/Users/Jakob/Saved Games/Hades II/Profile1.sav");
+        let (mut savefile, lua_state) = super::Savefile::parse(data)?;
+
+        let mut out = Vec::new();
+        savefile.serialize(&mut out, &lua_state)?;
+
+        let (mut savefile_reparsed, lua_state_reparsed) = super::Savefile::parse(&out)?;
+
+        savefile.checksum = 0;
+        savefile_reparsed.checksum = 0;
+
+        assert_eq!(savefile, savefile_reparsed);
+        assert_eq!(lua_state, lua_state_reparsed);
+
+        Ok(())
+    }
 }

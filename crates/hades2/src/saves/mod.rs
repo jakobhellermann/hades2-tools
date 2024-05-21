@@ -2,13 +2,13 @@ use crate::LocateError;
 use std::path::{Path, PathBuf};
 
 #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
-pub(crate) fn save_dir(_steam_dir: &Path) -> Result<PathBuf, crate::LocateError> {
+pub(crate) fn save_dir(_steam_dir: &Path) -> Result<PathBuf, LocateError> {
     Err(LocateError::UnsupportedPlatform)
 }
 
 #[cfg(target_os = "windows")]
-pub(crate) fn save_dir(_steam_dir: &Path) -> Result<PathBuf, crate::LocateError> {
-    let home_dir = dirs::home_dir().ok_or_else(|| Error::Other)?;
+pub(crate) fn save_dir(_steam_dir: &Path) -> Result<PathBuf, LocateError> {
+    let home_dir = dirs::home_dir().ok_or_else(|| LocateError::Other)?;
     let dir = home_dir.join("Saved Games/Hades II");
     if !dir.exists() {
         return Err(LocateError::NotFound);

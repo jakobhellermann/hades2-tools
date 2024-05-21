@@ -14,5 +14,4 @@ serde = { version = "1.0.202", optional = true }
 
 [target.'cfg(target_os="windows")'.dependencies]
 winreg = "0.52"
-[target.'cfg(not(target_os="windows"))'.dependencies]
 dirs = "5.0"

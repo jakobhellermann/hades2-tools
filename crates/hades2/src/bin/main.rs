@@ -7,8 +7,8 @@ fn main() -> Result<()> {
     for save in [2] {
         let save = hades.save(save)?;
         dbg!(&save);
-        let lua = save.parse_lua_state()?;
-        // println!("{}...", &format!("{lua:?}")[..100]);
+        let _lua = save.parse_lua_state()?;
+        // println!("{}...", &format!("{_lua:?}")[..100]);
     }
 
     Ok(())

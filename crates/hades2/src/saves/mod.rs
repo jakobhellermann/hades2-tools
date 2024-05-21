@@ -43,7 +43,7 @@ use crate::parser::*;
 #[derive(Clone, Debug)]
 pub struct Savefile {
     pub location: String,
-    pub checksum: [u8; 4],
+    pub checksum: u32,
     pub timestamp: u64,
     pub runs: u32,
     pub accumulated_meta_points: u32,
@@ -58,6 +58,8 @@ pub struct Savefile {
 
 impl Savefile {
     pub fn parse(mut data: &[u8]) -> Result<(Savefile, LuaValue<'static>)> {
+        let computed_checksum = adler32::RollingAdler32::from_buffer(&data[8..]).hash();
+
         let (savefile, lua_state) = parse_inner(&mut data)?;
         let lua_state = lz4_flex::block::decompress(lua_state, 15679488)?;
 
@@ -66,6 +68,10 @@ impl Savefile {
             return Err(Error::LuaError);
         }
         let lua_state = lua_state.into_iter().next().unwrap();
+
+        if computed_checksum != savefile.checksum {
+            return Err(Error::ChecksumError);
+        }
 
         Ok((savefile, lua_state))
     }
@@ -82,7 +88,7 @@ fn parse_inner<'i>(data: &mut &'i [u8]) -> Result<(Savefile, &'i [u8])> {
         return Err(Error::SignatureMismatch);
     }
 
-    let checksum = read_bytes_array::<4>(data)?;
+    let checksum = read_u32(data)?;
 
     let version = read_u32(data)?;
     if version != 17 {

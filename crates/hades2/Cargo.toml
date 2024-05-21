@@ -12,6 +12,7 @@ lz4_flex = "0.11"
 thiserror = "1.0"
 dirs = "5.0"
 serde = { version = "1.0", optional = true }
+adler32 = { version = "1.2", default-features = false }
 
 [target.'cfg(target_os="windows")'.dependencies]
 winreg = "0.52"

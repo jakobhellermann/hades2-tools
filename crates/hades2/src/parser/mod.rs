@@ -6,6 +6,8 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 pub enum Error {
     #[error("File does not begin with correct signature")]
     SignatureMismatch,
+    #[error("File was corrupted (invalid checksum)")]
+    ChecksumError,
     #[error("Savefile version is {0}, only 17 is supported")]
     UnsupportedVersion(u32),
     #[error("Unexpected end of savefile while reading data")]

@@ -40,10 +40,10 @@ pub use crate::parser::luabins::Value as LuaValue;
 pub use crate::parser::Result;
 use crate::parser::*;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Savefile {
     pub location: String,
-    checksum: [u8; 4],
+    pub checksum: [u8; 4],
     pub timestamp: u64,
     pub runs: u32,
     pub accumulated_meta_points: u32,
@@ -54,49 +54,29 @@ pub struct Savefile {
     pub lua_keys: Vec<String>,
     pub current_map_name: String,
     pub start_next_map: String,
-    pub lua_state: Vec<u8>,
-}
-
-impl std::fmt::Debug for Savefile {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Savefile")
-            .field("checksum", &self.checksum)
-            .field("location", &self.location)
-            .field("current_map_name", &self.current_map_name)
-            .field("start_next_map", &self.start_next_map)
-            .field("runs", &(self.runs + 1))
-            .field("accumulated_meta_points", &self.accumulated_meta_points)
-            .field("active_shrine_points", &self.active_shrine_points)
-            .field("grasp", &self.grasp)
-            .field("easy_mode", &self.easy_mode)
-            .field("hard_mode", &self.hard_mode)
-            .field("lua_keys", &self.lua_keys)
-            .field("lua_state", &"...")
-            .finish()
-    }
 }
 
 impl Savefile {
-    pub fn parse(mut data: &[u8]) -> Result<Savefile> {
-        parse_inner(&mut data, true)
-    }
-    pub fn parse_header_only(mut data: &[u8]) -> Result<Savefile> {
-        parse_inner(&mut data, false)
-    }
+    pub fn parse(mut data: &[u8]) -> Result<(Savefile, LuaValue<'static>)> {
+        let (savefile, lua_state) = parse_inner(&mut data)?;
+        let lua_state = lz4_flex::block::decompress(lua_state, 15679488)?;
 
-    pub fn parse_lua_state(&self) -> Result<LuaValue<'static>> {
-        let lua_state = luabins::read_luabins(&mut self.lua_state.as_slice())?;
+        let lua_state = luabins::read_luabins(&mut lua_state.as_slice())?;
         if lua_state.len() != 1 {
             return Err(Error::LuaError);
         }
+        let lua_state = lua_state.into_iter().next().unwrap();
 
-        let value = lua_state.into_iter().next().unwrap();
+        Ok((savefile, lua_state))
+    }
 
-        Ok(value)
+    pub fn parse_header_only(mut data: &[u8]) -> Result<Savefile> {
+        let (savefile, _) = parse_inner(&mut data)?;
+        Ok(savefile)
     }
 }
 
-fn parse_inner<'i>(data: &mut &'i [u8], with_luastate: bool) -> Result<Savefile> {
+fn parse_inner<'i>(data: &mut &'i [u8]) -> Result<(Savefile, &'i [u8])> {
     let signature = read_bytes_array::<4>(data)?;
     if signature != [0x53, 0x47, 0x42, 0x31] {
         return Err(Error::SignatureMismatch);
@@ -123,30 +103,28 @@ fn parse_inner<'i>(data: &mut &'i [u8], with_luastate: bool) -> Result<Savefile>
     let start_next_map = read_str_prefix(data)?;
 
     let length = read_u32(data)?;
+
     let lua_state = read_bytes(data, length as usize)?;
 
     if data.len() > 0 {
         return Err(Error::UnexpectedAtEnd);
     }
 
-    let lua_state = match with_luastate {
-        true => lz4_flex::block::decompress(lua_state, 15679488)?,
-        false => Vec::new(),
-    };
-
-    Ok(Savefile {
-        checksum,
-        location: location.to_owned(),
-        timestamp,
-        runs,
-        accumulated_meta_points,
-        active_shrine_points,
-        grasp,
-        easy_mode,
-        hard_mode,
-        lua_keys,
-        current_map_name: current_map_name.to_owned(),
-        start_next_map: start_next_map.to_owned(),
+    Ok((
+        Savefile {
+            checksum,
+            location: location.to_owned(),
+            timestamp,
+            runs,
+            accumulated_meta_points,
+            active_shrine_points,
+            grasp,
+            easy_mode,
+            hard_mode,
+            lua_keys,
+            current_map_name: current_map_name.to_owned(),
+            start_next_map: start_next_map.to_owned(),
+        },
         lua_state,
-    })
+    ))
 }

@@ -11,13 +11,12 @@ extern "C" {
 
 #[wasm_bindgen]
 pub fn expand_savefile(data: &[u8], format: &str) -> Result<String, JsError> {
-    let savefile = hades2::saves::Savefile::parse(data)?;
-    let state = savefile.parse_lua_state()?;
+    let (_savefile, lua_state) = hades2::saves::Savefile::parse(data)?;
 
     let text = match format {
-        "text" => format!("{:#?}", state),
-        "json" => serde_json::to_string(&state)?,
-        "json-pretty" => serde_json::to_string_pretty(&state)?,
+        "text" => format!("{:#?}", lua_state),
+        "json" => serde_json::to_string(&lua_state)?,
+        "json-pretty" => serde_json::to_string_pretty(&lua_state)?,
         _ => return Err(JsError::new("expected `json` or `text`")),
     };
 

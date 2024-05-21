@@ -3,7 +3,9 @@ mod steamlocate;
 
 pub mod saves;
 
+use anyhow::Context;
 pub use anyhow::{Error, Result};
+use saves::LuaValue;
 use std::path::{Path, PathBuf};
 
 #[allow(unused)]
@@ -41,12 +43,13 @@ impl Hades2Installation {
         })
     }
 
-    pub fn save(&self, slot: u32) -> Result<saves::Savefile> {
-        let file = self.save_dir.join(format!("Profile{slot}.sav"));
-        let data = std::fs::read(file)?;
-        let savefile = saves::Savefile::parse(&data)?;
-        Ok(savefile)
+    pub fn save(&self, slot: u32) -> Result<SaveHandle> {
+        let path = self.save_dir.join(format!("Profile{slot}.sav"));
+        anyhow::ensure!(path.exists(), "save {slot} does not exist");
+        let handle = SaveHandle::from_path(path).context("context")?;
+        Ok(handle)
     }
+
     pub fn saves(&self) -> Result<Vec<SaveHandle>> {
         let mut saves = Vec::new();
         for save in self.save_dir.read_dir()? {
@@ -80,10 +83,10 @@ impl SaveHandle {
     pub fn path(&self) -> &Path {
         &self.0
     }
-    pub fn read(&self) -> Result<saves::Savefile> {
+    pub fn read(&self) -> Result<(saves::Savefile, LuaValue<'static>)> {
         let data = std::fs::read(&self.0)?;
-        let savefile = saves::Savefile::parse(&data)?;
-        Ok(savefile)
+        let result = saves::Savefile::parse(&data)?;
+        Ok(result)
     }
 
     pub fn read_header_only(&self) -> Result<saves::Savefile> {

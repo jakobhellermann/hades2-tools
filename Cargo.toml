@@ -1,7 +1,6 @@
 [workspace]
 resolver = "2"
 members = ["crates/*", "web/rust-bindings"]
-default-members = ["crates/hades2-savefile-editor"]
 
 [profile.dev.package."*"]
 opt-level = 2

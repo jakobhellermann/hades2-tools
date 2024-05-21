@@ -112,11 +112,7 @@ impl Application for SavefileEditor {
                         let file = picker.pick_file().await?;
                         let data = file.read().await;
 
-                        let savefile = hades2::saves::Savefile::parse(&data).and_then(|save| {
-                            let lua_state = save.parse_lua_state()?;
-
-                            Ok((save, lua_state))
-                        });
+                        let savefile = hades2::saves::Savefile::parse(&data);
                         Some((file.path().to_owned(), savefile))
                     },
                     |result| {
@@ -144,7 +140,7 @@ impl Application for SavefileEditor {
             }
             Message::OpenSlot(i) => {
                 let (handle, save) = &self.saves[i];
-                let lua_state = handle.read().and_then(|x| Ok(x.parse_lua_state()?));
+                let lua_state = handle.read().map(|(_, lua_state)| lua_state);
                 match lua_state {
                     Ok(state) => self.savefile = Some((handle.clone(), save.clone(), state)),
                     Err(e) => {

@@ -86,6 +86,20 @@ impl Value<'_> {
         f(self);
     }
 
+    pub fn is_primitive(&self) -> bool {
+        !matches!(self, Value::Table(_))
+    }
+
+    pub fn primitive_to_str(&self) -> Option<String> {
+        Some(match self {
+            Value::Nil => "Nil".into(),
+            Value::Bool(val) => val.to_string(),
+            Value::Number(val) => val.to_string(),
+            Value::String(val) => val.to_string(),
+            Value::Table(_) => return None,
+        })
+    }
+
     pub fn count(&self, include_keys: bool, f: &mut impl FnMut(&Value<'_>) -> bool) -> usize {
         let mut i = 0;
         self.visit(include_keys, &mut |value| {
@@ -146,7 +160,10 @@ pub fn read_value<'i>(data: &mut &'i [u8]) -> Result<Value<'static>> {
                 pairs.push((key, val));
             }
 
-            // pairs.sort_by(|(a, _), (b, _)| a.cmp(b));
+            pairs.sort_by(|(a, a_val), (b, b_val)| {
+                let primitive_first = b_val.is_primitive().cmp(&a_val.is_primitive());
+                primitive_first.then_with(|| a.cmp(b))
+            });
 
             Value::Table(pairs)
         }

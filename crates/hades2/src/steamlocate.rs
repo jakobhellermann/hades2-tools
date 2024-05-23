@@ -15,10 +15,8 @@ fn locate_steam_dir_helper() -> Result<PathBuf, LocateError> {
 
 #[cfg(target_os = "windows")]
 fn locate_steam_dir_helper() -> Result<PathBuf, LocateError> {
-    use winreg::{
-        enums::{HKEY_LOCAL_MACHINE, KEY_READ},
-        RegKey,
-    };
+    use winreg::enums::{HKEY_LOCAL_MACHINE, KEY_READ};
+    use winreg::RegKey;
 
     let io_to_locate_err = |_io_err| LocateError::Other;
 

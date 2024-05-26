@@ -194,16 +194,18 @@ fn serialize_inner<W: std::io::Write>(
 }
 
 #[cfg(test)]
+#[allow(const_item_mutation)]
 mod test {
     use anyhow::Result;
 
     use super::LZ4_MIN_DECOPMRESS_LEN;
 
+    // const EXAMPLE_PROFILE:&[u8] = include_bytes!("C:/Users/Jakob/Saved Games/Hades II/Profile1.sav").as_slice();
+    const EXAMPLE_PROFILE: &[u8] = include_bytes!("/home/jakob/.local/share/Steam/steamapps/compatdata/1145350/pfx/drive_c/users/steamuser/Saved Games/Hades II/Profile1.sav").as_slice();
+
     #[test]
     fn roundtrip_luabins() -> Result<()> {
-        let data = include_bytes!("C:/Users/Jakob/Saved Games/Hades II/Profile1.sav");
-
-        let (_, lua_state) = super::parse_inner(&mut data.as_slice())?;
+        let (_, lua_state) = super::parse_inner(&mut EXAMPLE_PROFILE)?;
         let lua_state_bytes = lz4_flex::block::decompress(lua_state, LZ4_MIN_DECOPMRESS_LEN)?;
         let lua_state = super::luabins::read_luabins(&mut lua_state_bytes.as_slice())?;
 
@@ -226,21 +228,19 @@ mod test {
 
     #[test]
     fn roundtrip_savefile() -> Result<()> {
-        let data = include_bytes!("C:/Users/Jakob/Saved Games/Hades II/Profile1.sav");
-        let (savefile, lua_state_compressed) = super::parse_inner(&mut data.as_slice())?;
+        let (savefile, lua_state_compressed) = super::parse_inner(&mut EXAMPLE_PROFILE)?;
 
         let mut out = Vec::new();
         super::serialize_inner(&mut out, &savefile, lua_state_compressed)?;
 
-        assert!(out.as_slice() == data);
+        assert!(out.as_slice() == EXAMPLE_PROFILE);
 
         Ok(())
     }
 
     #[test]
     fn roundtrip_reparse_savefile() -> Result<()> {
-        let data = include_bytes!("C:/Users/Jakob/Saved Games/Hades II/Profile1.sav");
-        let (mut savefile, lua_state) = super::Savefile::parse(data)?;
+        let (mut savefile, lua_state) = super::Savefile::parse(EXAMPLE_PROFILE)?;
 
         let mut out = Vec::new();
         savefile.serialize(&mut out, &lua_state)?;

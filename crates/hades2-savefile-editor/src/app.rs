@@ -1,3 +1,6 @@
+use std::fs::OpenOptions;
+use std::io::BufWriter;
+
 use anyhow::Result;
 use egui::{Grid, ScrollArea};
 use hades2::saves::{LuaValue, Savefile};
@@ -11,6 +14,9 @@ const AUTOLOAD: bool = true;
 #[serde(default)]
 pub struct App {
     advanced_mode: bool,
+
+    #[serde(skip)]
+    save_dialog: Option<SaveDialog>,
 
     #[serde(skip)]
     state: State,
@@ -35,6 +41,10 @@ struct CurrentSavefile {
     dirty: bool,
 }
 
+struct SaveDialog {
+    backups: Option<Vec<(SaveHandle, u64)>>,
+}
+
 impl App {
     fn hades(&self) -> Option<&Hades2Installation> {
         self.state.hades.as_ref()
@@ -48,6 +58,10 @@ impl App {
                 None
             }
         }
+    }
+
+    fn reset_error(&mut self) {
+        self.state.error = None;
     }
 
     fn load_savefiles(&mut self) -> Result<()> {
@@ -65,7 +79,7 @@ impl App {
             .collect::<Result<Vec<_>>>()?;
 
         if AUTOLOAD {
-            if let [(handle, _), ..] = self.state.saves.as_slice() {
+            if let [.., (handle, _)] = self.state.saves.as_slice() {
                 let (save, lua_state) = handle.read().unwrap();
                 self.current_savefile = Some(Box::new(CurrentSavefile {
                     filter: String::new(),
@@ -80,6 +94,18 @@ impl App {
         Ok(())
     }
 }
+impl CurrentSavefile {
+    fn save(&self) -> Result<()> {
+        let out = BufWriter::new(
+            OpenOptions::new()
+                .write(true)
+                .create(false)
+                .open(self.handle.path())?,
+        );
+        self.save.serialize(out, &self.lua_state)?;
+        Ok(())
+    }
+}
 
 impl Default for App {
     fn default() -> Self {
@@ -89,6 +115,7 @@ impl Default for App {
         };
         let mut app = Self {
             advanced_mode: false,
+            save_dialog: None,
             state: State {
                 hades,
                 error,
@@ -138,11 +165,16 @@ impl eframe::App for App {
                 if self.current_savefile.is_some() {
                     if ui.button("⏴").clicked() {
                         self.current_savefile = None;
+                        self.reset_error();
                     }
                 }
                 ui.heading(heading);
             });
             ui.separator();
+
+            if let Some(error) = &self.state.error {
+                ui.label(egui::RichText::new(error).color(egui::Color32::from_rgb(255, 51, 51)));
+            }
 
             let mut current_savefile = self.current_savefile.take();
             match current_savefile {
@@ -150,6 +182,66 @@ impl eframe::App for App {
                 Some(ref mut current) => {
                     self.ui_current(ui, ctx, current);
                     self.current_savefile = current_savefile;
+                }
+            }
+
+            let mut cancel = false;
+            let mut save_result = None;
+            if let Some(save_dialog) = &self.save_dialog {
+                let current = self.current_savefile.as_deref().unwrap();
+                current.save.timestamp;
+
+                egui::Window::new("Save")
+                    .title_bar(false)
+                    .pivot(egui::Align2::CENTER_CENTER)
+                    .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+                    .fixed_size([300.0, 200.0])
+                    .show(ctx, |ui| {
+                        ui.heading("Save?");
+
+                        match save_dialog.backups {
+                            Some(ref backups) => {
+                                ui.label("Backups");
+                                ui.indent("backups", |ui| {
+                                    for &(ref backup, timestamp) in backups {
+                                        let time = format_time(timestamp);
+                                        let diff = current.save.timestamp as i64 - timestamp as i64;
+
+                                        ui.label(format!(
+                                            "{} - {time} - {}",
+                                            backup.backup_index().unwrap(),
+                                            format_ago(diff)
+                                        ));
+                                    }
+                                });
+
+                                ui.add_enabled_ui(false, |ui| {
+                                    let _ = ui.button("Make backup");
+                                });
+                            }
+                            None => {
+                                ui.label("No backups found!");
+                            }
+                        };
+
+                        ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {
+                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Max), |ui| {
+                                if ui.button("Save (Overwrite current!)").clicked() {
+                                    save_result = Some(current.save());
+                                }
+                                cancel = ui.button("Cancel").clicked();
+                            });
+                        });
+                    });
+
+                if cancel {
+                    self.save_dialog = None;
+                }
+                if let Some(save_result) = save_result {
+                    if save_result.is_ok() {
+                        self.save_dialog = None;
+                    }
+                    self.handle_error(save_result);
                 }
             }
         });
@@ -172,9 +264,7 @@ impl App {
                 ui.label((save.runs + 1).to_string());
                 ui.label(save.grasp.to_string());
 
-                let time =
-                    time::OffsetDateTime::from_unix_timestamp(save.timestamp as i64).unwrap();
-                ui.label(format!("{} {}", time.date(), time.time()));
+                ui.label(format_time(save.timestamp));
 
                 if ui.button("Open").clicked() {
                     load_slot = Some(handle.clone());
@@ -224,15 +314,17 @@ impl App {
             ui.checkbox(&mut self.advanced_mode, "Advanced Mode");
         });
 
-        fn numeric<T: egui::emath::Numeric>(ui: &mut egui::Ui, label: &str, val: &mut T) {
+        fn numeric<T: egui::emath::Numeric>(ui: &mut egui::Ui, label: &str, val: &mut T) -> bool {
             ui.label(label);
-            ui.add(egui::DragValue::new(val));
+            let changed = ui.add(egui::DragValue::new(val)).changed();
             ui.end_row();
+            changed
         }
-        fn checkbox(ui: &mut egui::Ui, label: &str, val: &mut bool) {
+        fn checkbox(ui: &mut egui::Ui, label: &str, val: &mut bool) -> bool {
             ui.label(label);
-            ui.checkbox(val, "");
+            let changed = ui.checkbox(val, "").changed();
             ui.end_row();
+            changed
         }
 
         if self.advanced_mode {
@@ -244,20 +336,40 @@ impl App {
             });
         } else {
             Grid::new("easy mode").show(ui, |ui| {
-                numeric(ui, "Runs", &mut save.runs);
-                numeric(ui, "Grasp", &mut save.grasp);
-                numeric(ui, "Meta Points", &mut save.accumulated_meta_points);
-                numeric(ui, "Active Shrine Points", &mut save.active_shrine_points);
-                checkbox(ui, "Easy Mode", &mut save.easy_mode);
-                checkbox(ui, "Hard Mode", &mut save.hard_mode);
+                let mut changed = false;
+
+                let mut runs_human = save.runs + 1;
+                changed |= numeric(ui, "Runs", &mut runs_human);
+                save.runs = runs_human.saturating_sub(1);
+                changed |= numeric(ui, "Grasp", &mut save.grasp);
+                changed |= numeric(ui, "Meta Points", &mut save.accumulated_meta_points);
+                changed |= numeric(ui, "Active Shrine Points", &mut save.active_shrine_points);
+                changed |= checkbox(ui, "Easy Mode", &mut save.easy_mode);
+                changed |= checkbox(ui, "Hard Mode", &mut save.hard_mode);
+
+                *dirty |= changed;
             });
         }
 
         ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
             ui.horizontal(|ui| {
-                ui.add_enabled_ui(*dirty, |ui| {
+                ui.add_enabled_ui(*dirty || true, |ui| {
                     if ui.button("Save").clicked() {
-                        dbg!();
+                        self.reset_error();
+                        let res = self.hades().map(|hades| {
+                            hades.backups(current.handle.slot()).and_then(|backups| {
+                                backups
+                                    .into_iter()
+                                    .map(|backup| {
+                                        let timestamp = backup.read_header_only()?.timestamp;
+                                        Ok((backup, timestamp))
+                                    })
+                                    .collect::<Result<Vec<_>>>()
+                            })
+                        });
+                        if let Some(backups) = self.handle_error(res.transpose()) {
+                            self.save_dialog = Some(SaveDialog { backups });
+                        }
                     }
                 });
             });
@@ -271,4 +383,28 @@ impl App {
             )));
         }
     }
+}
+
+fn format_time(timestamp: u64) -> String {
+    let time = time::OffsetDateTime::from_unix_timestamp(timestamp as i64).unwrap();
+    format!("{} {}", time.date(), time.time())
+}
+
+fn format_ago(seconds: i64) -> String {
+    if seconds < 60 {
+        return format!("{} seconds ago", seconds);
+    }
+
+    let minutes = seconds / 60;
+    if minutes < 60 {
+        return format!("{} minutes ago", minutes);
+    }
+
+    let hours = minutes / 60;
+    if hours < 60 {
+        return format!("{} hours ago", hours);
+    }
+
+    let days = hours / 24;
+    return format!("{} days ago", days);
 }

@@ -65,19 +65,20 @@ fn show_table(
 
     let mut changed = false;
 
-    let has_primitives = table
-        .iter()
-        .next()
-        .map_or(false, |(_, val)| val.is_primitive());
-
-    let mut entries = table
+    let entries = table
         .iter_mut()
         .enumerate()
         .map(|(i, entry)| {
             let new_pos = pos.push(i.try_into().unwrap());
             (new_pos, entry)
         })
-        .peekable();
+        .collect::<Vec<_>>();
+
+    let has_primitives = entries.iter().any(|(pos, (_, val))| {
+        val.is_primitive() && nodes_visible.map_or(true, |v| v.contains_key(&pos))
+    });
+
+    let mut entries = entries.into_iter().peekable();
 
     if has_primitives {
         Grid::new(egui::Id::new(&pos)).show(ui, |ui| {

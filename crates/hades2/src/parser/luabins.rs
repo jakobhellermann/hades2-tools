@@ -90,12 +90,12 @@ impl Value<'_> {
         !matches!(self, Value::Table(_))
     }
 
-    pub fn primitive_to_str(&self) -> Option<String> {
+    pub fn primitive_to_str(&self) -> Option<Cow<'_, str>> {
         Some(match self {
             Value::Nil => "Nil".into(),
-            Value::Bool(val) => val.to_string(),
-            Value::Number(val) => val.to_string(),
-            Value::String(val) => val.to_string(),
+            Value::Bool(val) => val.to_string().into(),
+            Value::Number(val) => val.to_string().into(),
+            Value::String(val) => Cow::Borrowed(val.as_ref()),
             Value::Table(_) => return None,
         })
     }

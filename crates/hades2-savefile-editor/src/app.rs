@@ -8,6 +8,8 @@ use egui::{Grid, ScrollArea};
 use hades2::saves::{LuaValue, Savefile};
 use hades2::{Hades2Installation, SaveHandle};
 
+use self::luavalue::Pos;
+
 mod luavalue;
 
 const AUTOLOAD: bool = true;
@@ -333,10 +335,9 @@ impl App {
             ui.text_edit_singleline(filter);
 
             let nodes_visible = record_filter(lua_state, &filter.to_lowercase());
-            dbg!(&nodes_visible);
 
             ScrollArea::vertical().show(ui, |ui| {
-                *dirty |= luavalue::show_value(ui, lua_state, (0, 0), Some(&nodes_visible));
+                *dirty |= luavalue::show_value(ui, lua_state, Pos::default(), Some(&nodes_visible));
                 ui.allocate_space(ui.available_size());
             });
         } else {
@@ -415,14 +416,19 @@ fn format_ago(seconds: i64) -> String {
 }
 
 fn matches_filter(key: &LuaValue, val: &LuaValue, filter_lowercase: &str) -> bool {
-    key.primitive_to_str()
-        .map_or(false, |s| s.to_lowercase().contains(filter_lowercase))
-        || val
-            .primitive_to_str()
-            .map_or(false, |s| s.to_lowercase().contains(filter_lowercase))
+    let key_matches = key
+        .primitive_to_str()
+        .map_or(false, |s| s.to_lowercase().contains(filter_lowercase));
+
+    let match_value = false;
+    key_matches
+        || (match_value
+            && val
+                .primitive_to_str()
+                .map_or(false, |s| s.to_lowercase().contains(filter_lowercase)))
 }
 
-fn record_filter<'l>(root: &LuaValue, filter_lowercase: &str) -> HashMap<(usize, usize), bool> {
+fn record_filter<'l>(root: &LuaValue, filter_lowercase: &str) -> HashMap<Pos, bool> {
     // INVARIANT: if X in nodes_visible then ancestors(X) in nodes_visible
     let mut nodes_visible = HashMap::default();
 
@@ -432,10 +438,10 @@ fn record_filter<'l>(root: &LuaValue, filter_lowercase: &str) -> HashMap<(usize,
         &mut ancestor_scratch,
         &mut |key, val, ancestors, pos| {
             if matches_filter(key, val, filter_lowercase) {
-                nodes_visible.insert(pos, false);
+                nodes_visible.insert(pos, true);
 
-                for &ancestor in ancestors.iter().rev() {
-                    let was_occupied = match nodes_visible.entry(ancestor) {
+                for ancestor in ancestors.iter().rev() {
+                    let was_occupied = match nodes_visible.entry(ancestor.clone()) {
                         Entry::Occupied(_) => true,
                         Entry::Vacant(vacant) => {
                             vacant.insert(false);
@@ -448,7 +454,7 @@ fn record_filter<'l>(root: &LuaValue, filter_lowercase: &str) -> HashMap<(usize,
                 }
             }
         },
-        (0, 0),
+        Pos::default(),
     );
 
     nodes_visible
@@ -456,9 +462,9 @@ fn record_filter<'l>(root: &LuaValue, filter_lowercase: &str) -> HashMap<(usize,
 
 pub fn visit_with_ancestors<'l>(
     val: &'l LuaValue<'l>,
-    ancestors: &mut Vec<(usize, usize)>,
-    f_key: &mut impl FnMut(&'l LuaValue<'l>, &'l LuaValue<'l>, &[(usize, usize)], (usize, usize)),
-    pos: (usize, usize),
+    ancestors: &mut Vec<Pos>,
+    f_key: &mut impl FnMut(&'l LuaValue<'l>, &'l LuaValue<'l>, &[Pos], Pos),
+    pos: Pos,
 ) {
     match val {
         LuaValue::Nil => {}
@@ -466,10 +472,10 @@ pub fn visit_with_ancestors<'l>(
         LuaValue::Number(_) => {}
         LuaValue::String(_) => {}
         LuaValue::Table(table) => {
-            ancestors.push(pos);
+            ancestors.push(pos.clone());
             for (i, (key, val)) in table.iter().enumerate() {
-                let new_pos = (pos.0 + 1, i);
-                f_key(key, val, ancestors.as_slice(), new_pos);
+                let new_pos = pos.push(i.try_into().unwrap());
+                f_key(key, val, ancestors.as_slice(), new_pos.clone());
                 visit_with_ancestors(val, ancestors, f_key, new_pos);
             }
             ancestors.pop();

@@ -2,11 +2,23 @@ use egui::ahash::HashMap;
 use egui::{CollapsingHeader, Grid, TextEdit, Widget};
 use hades2::saves::LuaValue;
 
+#[derive(Eq, PartialEq, Hash, Clone, Default)]
+pub struct Pos(Vec<u16>);
+
+impl Pos {
+    #[must_use]
+    pub fn push(&self, val: u16) -> Pos {
+        let mut x = self.clone();
+        x.0.push(val);
+        x
+    }
+}
+
 pub fn show_value(
     ui: &mut egui::Ui,
     val: &mut LuaValue,
-    pos: (usize, usize),
-    nodes_visible: Option<&HashMap<(usize, usize), bool>>,
+    pos: Pos,
+    nodes_visible: Option<&HashMap<Pos, bool>>,
 ) -> bool {
     let response = match val {
         LuaValue::Nil => ui.label("Nil"),
@@ -29,12 +41,15 @@ pub fn show_value(
 fn show_table(
     ui: &mut egui::Ui,
     table: &mut [(LuaValue, LuaValue)],
-    pos: (usize, usize),
-    nodes_visible: Option<&HashMap<(usize, usize), bool>>,
+    pos: Pos,
+    nodes_visible: Option<&HashMap<Pos, bool>>,
 ) -> bool {
-    let test_visible = |pos| {
+    fn test_visible<'a>(
+        pos: &Pos,
+        nodes_visible: Option<&'a HashMap<Pos, bool>>,
+    ) -> (bool, Option<&'a HashMap<Pos, bool>>) {
         let (is_visible, all_children_visible) = match nodes_visible {
-            Some(visibles) => match visibles.get(&pos) {
+            Some(visibles) => match visibles.get(pos) {
                 Some(true) => (true, true),
                 Some(false) => (true, false),
                 None => (false, false),
@@ -46,7 +61,7 @@ fn show_table(
             false => nodes_visible,
         };
         (is_visible, nodes_visible_children)
-    };
+    }
 
     let mut changed = false;
 
@@ -59,19 +74,19 @@ fn show_table(
         .iter_mut()
         .enumerate()
         .map(|(i, entry)| {
-            let new_pos = (pos.0 + 1, i);
+            let new_pos = pos.push(i.try_into().unwrap());
             (new_pos, entry)
         })
         .peekable();
 
     if has_primitives {
-        Grid::new(pos).show(ui, |ui| {
-            while let Some(&mut (pos, (key, val))) = entries.peek_mut() {
+        Grid::new(egui::Id::new(&pos)).show(ui, |ui| {
+            while let Some(&mut (ref pos, (key, val))) = entries.peek_mut() {
                 if !val.is_primitive() {
                     break;
                 }
 
-                let (is_visible, nodevis_children) = test_visible(pos);
+                let (is_visible, nodevis_children) = test_visible(pos, nodes_visible);
 
                 if !is_visible {
                     entries.next();
@@ -79,10 +94,10 @@ fn show_table(
                 }
 
                 ui.add_enabled_ui(false, |ui| {
-                    show_value(ui, key, pos, nodevis_children);
+                    show_value(ui, key, pos.clone(), nodevis_children);
                 });
 
-                changed |= show_value(ui, val, pos, nodevis_children);
+                changed |= show_value(ui, val, pos.clone(), nodevis_children);
                 ui.end_row();
 
                 entries.next();
@@ -91,7 +106,7 @@ fn show_table(
     }
 
     for (pos, (key, val)) in entries {
-        let (is_visible, nodevis_children) = test_visible(pos);
+        let (is_visible, nodevis_children) = test_visible(&pos, nodes_visible);
         if !is_visible {
             continue;
         }
@@ -99,11 +114,13 @@ fn show_table(
         let LuaValue::Table(inner) = val else {
             unreachable!()
         };
-        let name = key.primitive_to_str().unwrap_or(String::new());
+        let name = key.primitive_to_str().unwrap_or_default();
 
-        CollapsingHeader::new(name).id_source(pos).show(ui, |ui| {
-            changed |= show_table(ui, inner, pos, nodevis_children);
-        });
+        CollapsingHeader::new(name)
+            .id_source(egui::Id::new(&pos))
+            .show(ui, |ui| {
+                changed |= show_table(ui, inner, pos.clone(), nodevis_children);
+            });
     }
 
     changed

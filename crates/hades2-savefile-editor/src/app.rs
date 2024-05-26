@@ -1,7 +1,9 @@
+use std::collections::hash_map::Entry;
 use std::fs::OpenOptions;
 use std::io::BufWriter;
 
 use anyhow::Result;
+use egui::ahash::HashMap;
 use egui::{Grid, ScrollArea};
 use hades2::saves::{LuaValue, Savefile};
 use hades2::{Hades2Installation, SaveHandle};
@@ -330,8 +332,11 @@ impl App {
         if self.advanced_mode {
             ui.text_edit_singleline(filter);
 
+            let nodes_visible = record_filter(lua_state, &filter.to_lowercase());
+            dbg!(&nodes_visible);
+
             ScrollArea::vertical().show(ui, |ui| {
-                *dirty |= luavalue::show_value(ui, lua_state, (0, 0));
+                *dirty |= luavalue::show_value(ui, lua_state, (0, 0), Some(&nodes_visible));
                 ui.allocate_space(ui.available_size());
             });
         } else {
@@ -407,4 +412,67 @@ fn format_ago(seconds: i64) -> String {
 
     let days = hours / 24;
     return format!("{} days ago", days);
+}
+
+fn matches_filter(key: &LuaValue, val: &LuaValue, filter_lowercase: &str) -> bool {
+    key.primitive_to_str()
+        .map_or(false, |s| s.to_lowercase().contains(filter_lowercase))
+        || val
+            .primitive_to_str()
+            .map_or(false, |s| s.to_lowercase().contains(filter_lowercase))
+}
+
+fn record_filter<'l>(root: &LuaValue, filter_lowercase: &str) -> HashMap<(usize, usize), bool> {
+    // INVARIANT: if X in nodes_visible then ancestors(X) in nodes_visible
+    let mut nodes_visible = HashMap::default();
+
+    let mut ancestor_scratch = Vec::new();
+    visit_with_ancestors(
+        root,
+        &mut ancestor_scratch,
+        &mut |key, val, ancestors, pos| {
+            if matches_filter(key, val, filter_lowercase) {
+                nodes_visible.insert(pos, false);
+
+                for &ancestor in ancestors.iter().rev() {
+                    let was_occupied = match nodes_visible.entry(ancestor) {
+                        Entry::Occupied(_) => true,
+                        Entry::Vacant(vacant) => {
+                            vacant.insert(false);
+                            false
+                        }
+                    };
+                    if was_occupied {
+                        // break;
+                    }
+                }
+            }
+        },
+        (0, 0),
+    );
+
+    nodes_visible
+}
+
+pub fn visit_with_ancestors<'l>(
+    val: &'l LuaValue<'l>,
+    ancestors: &mut Vec<(usize, usize)>,
+    f_key: &mut impl FnMut(&'l LuaValue<'l>, &'l LuaValue<'l>, &[(usize, usize)], (usize, usize)),
+    pos: (usize, usize),
+) {
+    match val {
+        LuaValue::Nil => {}
+        LuaValue::Bool(_) => {}
+        LuaValue::Number(_) => {}
+        LuaValue::String(_) => {}
+        LuaValue::Table(table) => {
+            ancestors.push(pos);
+            for (i, (key, val)) in table.iter().enumerate() {
+                let new_pos = (pos.0 + 1, i);
+                f_key(key, val, ancestors.as_slice(), new_pos);
+                visit_with_ancestors(val, ancestors, f_key, new_pos);
+            }
+            ancestors.pop();
+        }
+    }
 }

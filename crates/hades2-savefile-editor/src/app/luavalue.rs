@@ -2,15 +2,47 @@ use egui::ahash::HashMap;
 use egui::{CollapsingHeader, Grid, TextEdit, Widget};
 use hades2::saves::LuaValue;
 
-#[derive(Eq, PartialEq, Hash, Clone, Default)]
-pub struct Pos(Vec<u16>);
+#[derive(Eq, PartialEq, Hash, Clone)]
+pub enum Pos {
+    Inline(u8, [u8; 15]),
+    Spilled(Vec<u16>),
+}
+
+const _: () = assert!(std::mem::size_of::<Pos>() == 24);
+
+impl Default for Pos {
+    fn default() -> Self {
+        Pos::Inline(0, [0; 15])
+    }
+}
 
 impl Pos {
+    const MAX_INLINE_DEPTH: usize = 16;
+    const MAX_INLINE_CHILD: u16 = u8::MAX as u16;
+
     #[must_use]
     pub fn push(&self, val: u16) -> Pos {
-        let mut x = self.clone();
-        x.0.push(val);
-        x
+        match *self {
+            Pos::Inline(len, ref data) => {
+                let spill = len as usize == Self::MAX_INLINE_DEPTH || val > Self::MAX_INLINE_CHILD;
+
+                if spill {
+                    let mut new = Vec::with_capacity(len as usize + 1);
+                    new.extend(data.iter().copied().take(len as usize).map(u16::from));
+                    new.push(val);
+                    Pos::Spilled(new)
+                } else {
+                    let mut new_data = *data;
+                    new_data[len as usize] = val.try_into().unwrap();
+                    Pos::Inline(len + 1, new_data)
+                }
+            }
+            Pos::Spilled(ref vec) => {
+                let mut new = Vec::with_capacity(vec.len() + 1);
+                new.push(val);
+                Pos::Spilled(new)
+            }
+        }
     }
 }
 

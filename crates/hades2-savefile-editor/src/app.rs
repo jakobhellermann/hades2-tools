@@ -4,7 +4,7 @@ use std::io::BufWriter;
 
 use anyhow::Result;
 use egui::ahash::HashMap;
-use egui::{Grid, ScrollArea};
+use egui::{Grid, ScrollArea, TextEdit};
 use hades2::saves::{LuaValue, Savefile};
 use hades2::{Hades2Installation, SaveHandle};
 
@@ -315,7 +315,26 @@ impl App {
         let was_dirty = *dirty;
 
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
-            ui.checkbox(&mut self.advanced_mode, "Advanced Mode");
+            ui.with_layout(egui::Layout::top_down(egui::Align::Max), |ui| {
+                ui.checkbox(&mut self.advanced_mode, "Advanced Mode");
+
+                if self.advanced_mode {
+                    ui.horizontal(|ui| {
+                        let res = TextEdit::singleline(filter)
+                            .hint_text("^resources")
+                            .show(ui)
+                            .response;
+
+                        if ui.input_mut(|input| {
+                            input.consume_key(egui::Modifiers::CTRL, egui::Key::F)
+                        }) {
+                            res.request_focus();
+                        }
+
+                        ui.label("Filter");
+                    });
+                }
+            });
         });
 
         fn numeric<T: egui::emath::Numeric>(ui: &mut egui::Ui, label: &str, val: &mut T) -> bool {
@@ -332,8 +351,6 @@ impl App {
         }
 
         if self.advanced_mode {
-            ui.text_edit_singleline(filter);
-
             let nodes_visible = record_filter(lua_state, &filter.to_lowercase());
 
             ScrollArea::vertical().show(ui, |ui| {
@@ -415,17 +432,23 @@ fn format_ago(seconds: i64) -> String {
     return format!("{} days ago", days);
 }
 
-fn matches_filter(key: &LuaValue, val: &LuaValue, filter_lowercase: &str) -> bool {
-    let key_matches = key
-        .primitive_to_str()
-        .map_or(false, |s| s.to_lowercase().contains(filter_lowercase));
+fn matches_filter(key: &LuaValue, _val: &LuaValue, filter_lowercase: &str) -> bool {
+    let key = key.primitive_to_str().unwrap_or_default().to_lowercase();
 
-    let match_value = false;
-    key_matches
-        || (match_value
-            && val
-                .primitive_to_str()
-                .map_or(false, |s| s.to_lowercase().contains(filter_lowercase)))
+    let (starts_with, filter_lowercase) = match filter_lowercase.strip_prefix('^') {
+        Some(rest) => (true, rest),
+        None => (false, filter_lowercase),
+    };
+    let (ends_with, filter_lowercase) = match filter_lowercase.strip_suffix('$') {
+        Some(rest) => (true, rest),
+        None => (false, filter_lowercase),
+    };
+
+    key.find(filter_lowercase)
+        .filter(|&s| {
+            (!starts_with || s == 0) && (!ends_with || s + filter_lowercase.len() == key.len())
+        })
+        .is_some()
 }
 
 fn record_filter<'l>(root: &LuaValue, filter_lowercase: &str) -> HashMap<Pos, bool> {

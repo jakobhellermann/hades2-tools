@@ -117,11 +117,9 @@ fn show_table(
         };
         let name = key.primitive_to_str().unwrap_or_default();
 
-        CollapsingHeader::new(name)
-            .id_source(egui::Id::new(&pos))
-            .show(ui, |ui| {
-                changed |= show_table(ui, inner, pos.clone(), nodevis_children);
-            });
+        CollapsingHeader::new(name).show(ui, |ui| {
+            changed |= show_table(ui, inner, pos.clone(), nodevis_children);
+        });
     }
 
     changed

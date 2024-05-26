@@ -1,0 +1,7 @@
+[
+  {
+    "label": "Savefile Editor",
+    "command": "cargo run -p hades2-savefile-editor",
+    "reveal": "never",
+  }
+]

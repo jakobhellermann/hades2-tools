@@ -3,12 +3,58 @@ use std::borrow::Cow;
 use super::*;
 
 #[derive(PartialEq, PartialOrd, Clone)]
+pub struct LuaTable<'a>(pub Vec<(Value<'a>, Value<'a>)>);
+
+impl<'a> IntoIterator for &'a LuaTable<'a> {
+    type Item = &'a (Value<'a>, Value<'a>);
+
+    type IntoIter = core::slice::Iter<'a, (Value<'a>, Value<'a>)>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}
+
+impl<'a> LuaTable<'a> {
+    pub fn iter(&self) -> impl Iterator<Item = &(Value<'a>, Value<'a>)> {
+        self.0.iter()
+    }
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut (Value<'a>, Value<'a>)> {
+        self.0.iter_mut()
+    }
+
+    pub fn get_or_insert(&mut self, key: &str, insert: Value<'a>) -> &mut Value<'a> {
+        let pos = self
+            .0
+            .iter()
+            .position(|(k, _)| k.is_str(key))
+            .unwrap_or_else(|| {
+                let i = self.0.len();
+                self.0.push((Value::String(key.to_owned().into()), insert));
+                i
+            });
+        self.sort();
+        &mut self.0[pos].1
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+    pub fn sort(&mut self) {
+        self.0.sort_by(|(a, a_val), (b, b_val)| {
+            let primitive_first = b_val.is_primitive().cmp(&a_val.is_primitive());
+            primitive_first.then_with(|| a.cmp(b))
+        });
+    }
+}
+
+#[derive(PartialEq, PartialOrd, Clone)]
 pub enum Value<'a> {
     Nil,
     Bool(bool),
     Number(f64),
     String(Cow<'a, str>),
-    Table(Vec<(Value<'a>, Value<'a>)>),
+    Table(LuaTable<'a>),
 }
 impl std::cmp::Eq for Value<'_> {}
 impl std::cmp::Ord for Value<'_> {
@@ -34,7 +80,7 @@ impl std::cmp::Ord for Value<'_> {
                         .cmp(&self_underscore)
                         .then_with(|| f0_self.cmp(&f0_other))
                 }
-                (Value::Table(f0_self), Value::Table(f0_other)) => f0_self.cmp(&f0_other),
+                (Value::Table(f0_self), Value::Table(f0_other)) => f0_self.0.cmp(&f0_other.0),
                 _ => std::cmp::Ordering::Equal,
             },
             other => other,
@@ -61,13 +107,35 @@ impl<'a> std::fmt::Debug for Value<'a> {
     }
 }
 
-impl Value<'_> {
-    pub fn as_table(&self) -> Option<&[(Value<'_>, Value<'_>)]> {
-        match self {
-            Value::Table(entries) => Some(entries.as_slice()),
+impl<'l> Value<'l> {
+    pub const EMPTY_TABLE: Self = Value::Table(LuaTable(Vec::new()));
+
+    pub fn as_number(&self) -> Option<f64> {
+        match *self {
+            Value::Number(val) => Some(val),
             _ => None,
         }
     }
+    pub fn as_number_mut(&mut self) -> Option<&mut f64> {
+        match self {
+            Value::Number(val) => Some(val),
+            _ => None,
+        }
+    }
+
+    pub fn as_table(&self) -> Option<&LuaTable<'l>> {
+        match self {
+            Value::Table(entries) => Some(&entries),
+            _ => None,
+        }
+    }
+    pub fn as_table_mut(&mut self) -> Option<&mut LuaTable<'l>> {
+        match self {
+            Value::Table(entries) => Some(entries),
+            _ => None,
+        }
+    }
+
     pub fn visit(&self, include_keys: bool, f: &mut impl FnMut(&Value<'_>)) {
         match self {
             Value::Nil => {}
@@ -88,6 +156,13 @@ impl Value<'_> {
 
     pub fn is_primitive(&self) -> bool {
         !matches!(self, Value::Table(_))
+    }
+
+    pub fn is_str(&self, val: &str) -> bool {
+        match self {
+            Value::String(str) => str.as_ref() == val,
+            _ => false,
+        }
     }
 
     pub fn primitive_to_str(&self) -> Option<Cow<'_, str>> {
@@ -160,12 +235,9 @@ pub fn read_value<'i>(data: &mut &'i [u8]) -> Result<Value<'static>> {
                 pairs.push((key, val));
             }
 
-            pairs.sort_by(|(a, a_val), (b, b_val)| {
-                let primitive_first = b_val.is_primitive().cmp(&a_val.is_primitive());
-                primitive_first.then_with(|| a.cmp(b))
-            });
-
-            Value::Table(pairs)
+            let mut table = LuaTable(pairs);
+            table.sort();
+            Value::Table(table)
         }
         _ => return Err(Error::LuaError),
     };
@@ -216,16 +288,16 @@ pub use write::write_luabins;
 // from https://github.com/TannerRogalsky/luabins/blob/306510abeaec25784b606039202de4d88c72f48b/src/lib.rs#L172C1-L258C2 (MIT)
 // since I already have my own parser without nom
 pub mod write {
-    use super::Value;
+    use super::{LuaTable, Value};
 
-    fn save_table(result: &mut Vec<u8>, table: &[(Value, Value)]) {
+    fn save_table(result: &mut Vec<u8>, table: &LuaTable) {
         // The canonical implementation of this function is here
         // https://github.com/lua/lua/blob/ad3942adba574c9d008c99ce2785a5af19d146bf/ltable.c#L889-L966
-        fn array_size(table: &[(Value, Value)]) -> usize {
+        fn array_size(table: &LuaTable) -> usize {
             let mut size = 0;
 
             for index in 1..=table.len() {
-                let v = table.iter().find(|(key, _value)| match *key {
+                let v = table.into_iter().find(|(key, _value)| match *key {
                     Value::Number(num) => index == num as usize,
                     _ => false,
                 });

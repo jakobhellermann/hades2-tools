@@ -39,7 +39,7 @@ pub(crate) fn save_dir(steam_dir: &Path) -> Result<PathBuf, LocateError> {
     Ok(dir)
 }
 
-pub use crate::parser::luabins::Value as LuaValue;
+pub use crate::parser::luabins::{LuaTable, Value as LuaValue};
 pub use crate::parser::Result;
 use crate::parser::*;
 

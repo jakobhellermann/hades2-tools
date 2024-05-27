@@ -1,6 +1,6 @@
 use egui::ahash::HashMap;
 use egui::{CollapsingHeader, Grid, TextEdit, Widget};
-use hades2::saves::LuaValue;
+use hades2::saves::{LuaTable, LuaValue};
 
 #[derive(Eq, PartialEq, Hash, Clone)]
 pub enum Pos {
@@ -72,7 +72,7 @@ pub fn show_value(
 
 fn show_table(
     ui: &mut egui::Ui,
-    table: &mut [(LuaValue, LuaValue)],
+    table: &mut LuaTable,
     pos: Pos,
     nodes_visible: Option<&HashMap<Pos, bool>>,
 ) -> bool {

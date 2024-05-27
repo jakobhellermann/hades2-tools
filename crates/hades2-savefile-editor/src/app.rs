@@ -14,7 +14,7 @@ use self::luavalue::Pos;
 
 mod luavalue;
 
-const AUTOLOAD: bool = true;
+const AUTOLOAD: bool = cfg!(debug_assertions) && true;
 
 #[derive(serde::Deserialize, serde::Serialize)]
 #[serde(default)]
@@ -388,16 +388,6 @@ impl App {
 
         let mut changed = false;
         if self.advanced_mode {
-            if filter.filter_changed {
-                filter.cached_visible = time("filter", || {
-                    record_filter(
-                        lua_state,
-                        &filter.filter.to_lowercase(),
-                        filter.search_values,
-                    )
-                });
-            }
-
             /*egui::CollapsingHeader::new("Header").show(ui, |ui| {
                 let mut runs_human = save.runs + 1;
                 changed |= numeric(ui, "Runs", &mut runs_human);
@@ -413,6 +403,17 @@ impl App {
                 changed |= checkbox(ui, "Hard Mode", &mut save.hard_mode);
             });
             ui.separator();*/
+
+            if filter.filter_changed {
+                filter.cached_visible = time("filter", || {
+                    record_filter(
+                        lua_state,
+                        &filter.filter.to_lowercase(),
+                        filter.search_values,
+                    )
+                });
+                filter.filter_changed = false;
+            }
 
             ScrollArea::vertical().show(ui, |ui| {
                 *dirty |= luavalue::show_value(
@@ -469,7 +470,7 @@ impl App {
                             .desired_width(80.)
                             .show(ui)
                             .response;
-                        filter.filter_changed = res.changed();
+                        filter.filter_changed |= res.changed();
                         if ui.input_mut(|input| {
                             input.consume_key(egui::Modifiers::CTRL, egui::Key::F)
                         }) {

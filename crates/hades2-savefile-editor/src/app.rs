@@ -38,7 +38,10 @@ struct State {
 
 struct FilterState {
     filter: String,
+    filter_changed: bool,
     search_values: bool,
+
+    cached_visible: HashMap<Pos, bool>,
 }
 
 struct CurrentSavefile {
@@ -93,8 +96,10 @@ impl App {
                 let (save, lua_state) = handle.read().unwrap();
                 self.current_savefile = Some(Box::new(CurrentSavefile {
                     filter: FilterState {
+                        filter_changed: true,
                         filter: String::new(),
                         search_values: false,
+                        cached_visible: HashMap::default(),
                     },
                     handle: handle.clone(),
                     save,
@@ -251,7 +256,9 @@ impl eframe::App for App {
 
         egui::CentralPanel::default().show(ctx, |ui| {
             let heading = match self.current_savefile {
-                Some(ref current) => format!("Savefile Editor - Slot {}", current.handle.slot()),
+                Some(ref current) => {
+                    format!("Savefile Editor - Slot {}", current.handle.slot())
+                }
                 None => "Savefile Editor".to_string(),
             };
             ui.horizontal(|ui| {
@@ -322,8 +329,10 @@ impl App {
             if let Some((save, lua_state)) = self.handle_error(result) {
                 self.current_savefile = Some(Box::new(CurrentSavefile {
                     filter: FilterState {
+                        filter_changed: true,
                         filter: String::new(),
                         search_values: false,
+                        cached_visible: HashMap::default(),
                     },
                     handle,
                     save,
@@ -360,13 +369,15 @@ impl App {
 
         let mut changed = false;
         if self.advanced_mode {
-            let nodes_visible = time("filter", || {
-                record_filter(
-                    lua_state,
-                    &filter.filter.to_lowercase(),
-                    filter.search_values,
-                )
-            });
+            if filter.filter_changed {
+                filter.cached_visible = time("filter", || {
+                    record_filter(
+                        lua_state,
+                        &filter.filter.to_lowercase(),
+                        filter.search_values,
+                    )
+                });
+            }
 
             /*egui::CollapsingHeader::new("Header").show(ui, |ui| {
                 let mut runs_human = save.runs + 1;
@@ -385,7 +396,12 @@ impl App {
             ui.separator();*/
 
             ScrollArea::vertical().show(ui, |ui| {
-                *dirty |= luavalue::show_value(ui, lua_state, Pos::default(), Some(&nodes_visible));
+                *dirty |= luavalue::show_value(
+                    ui,
+                    lua_state,
+                    Pos::default(),
+                    Some(&filter.cached_visible),
+                );
                 ui.allocate_space(ui.available_size());
             });
         } else {
@@ -434,6 +450,7 @@ impl App {
                             .desired_width(80.)
                             .show(ui)
                             .response;
+                        filter.filter_changed = res.changed();
                         if ui.input_mut(|input| {
                             input.consume_key(egui::Modifiers::CTRL, egui::Key::F)
                         }) {
@@ -634,12 +651,12 @@ fn numeric<T: egui::emath::Numeric>(ui: &mut egui::Ui, label: &str, val: &mut T)
     ui.end_row();
     changed
 }
-fn checkbox(ui: &mut egui::Ui, label: &str, val: &mut bool) -> bool {
-    ui.label(label);
-    let changed = ui.checkbox(val, "").changed();
-    ui.end_row();
-    changed
-}
+/*fn checkbox(ui: &mut egui::Ui, label: &str, val: &mut bool) -> bool {
+ui.label(label);
+let changed = ui.checkbox(val, "").changed();
+ui.end_row();
+changed
+}*/
 
 fn time<T>(name: &str, f: impl FnOnce() -> T) -> T {
     let start = Instant::now();

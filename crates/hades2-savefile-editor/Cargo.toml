@@ -6,11 +6,6 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0"
 hades2 = { version = "0.1", path = "../hades2" }
-iced = { version = "0.12", features = ["debug", "tokio"] }
-rfd = { version = "0.14", default-features = false, features = [
-    "xdg-portal",
-    "tokio",
-] }
 time = "0.3"
 
 serde = { version = "1", features = ["derive"] }

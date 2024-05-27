@@ -524,7 +524,7 @@ impl App {
 
 fn format_time(timestamp: u64) -> String {
     let time = time::OffsetDateTime::from_unix_timestamp(timestamp as i64).unwrap();
-    format!("{} {}", time.date(), time.time())
+    format!("{} {:02}:{:02}", time.date(), time.hour(), time.minute())
 }
 
 fn format_ago(seconds: i64) -> String {

@@ -13,8 +13,8 @@ use std::path::{Path, PathBuf};
 pub(crate) enum LocateError {
     #[error("platform not supported")]
     UnsupportedPlatform,
-    #[error("directory was not found")]
-    NotFound,
+    #[error("{0} was not found")]
+    NotFound(&'static str),
     #[error("error trying to find directory")]
     Other,
 }

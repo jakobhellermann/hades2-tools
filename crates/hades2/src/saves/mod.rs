@@ -14,7 +14,7 @@ pub(crate) fn save_dir(_steam_dir: &Path) -> Result<PathBuf, LocateError> {
     let home_dir = dirs::home_dir().ok_or_else(|| LocateError::Other)?;
     let dir = home_dir.join("Saved Games/Hades II");
     if !dir.exists() {
-        return Err(LocateError::NotFound);
+        return Err(LocateError::NotFound("`~/Saved Games/Hades II`"));
     }
     Ok(dir)
 }
@@ -26,14 +26,10 @@ pub(crate) fn save_dir(_steam_dir: &Path) -> Result<PathBuf, LocateError> {
 
 #[cfg(target_os = "linux")]
 pub(crate) fn save_dir(steam_dir: &Path) -> Result<PathBuf, LocateError> {
-    // if !dir.exists() {
-    // // return Err(Error::NotFound);
-    // }
-
     let dir = steam_dir
         .join("steamapps/compatdata/1145350/pfx/drive_c/users/steamuser/Saved Games/Hades II");
     if !dir.exists() {
-        return Err(LocateError::NotFound);
+        return Err(LocateError::NotFound("steam game 1145350"));
     }
 
     Ok(dir)

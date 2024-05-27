@@ -219,7 +219,10 @@ impl Default for App {
     fn default() -> Self {
         let (hades, error) = match Hades2Installation::detect() {
             Ok(val) => (Some(val), None),
-            Err(val) => (None, Some(format!("{val}"))),
+            Err(val) => (
+                None,
+                Some(format!("Could not detect Hades II installation: {val}\nPlease open an issue on github.")),
+            ),
         };
         let mut app = Self {
             advanced_mode: false,

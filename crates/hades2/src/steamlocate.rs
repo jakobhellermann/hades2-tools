@@ -83,5 +83,5 @@ fn locate_steam_dir_helper() -> Result<PathBuf, LocateError> {
     steam_paths
         .into_iter()
         .find(|x| x.is_dir())
-        .ok_or(LocateError::NotFound)
+        .ok_or_else(|| LocateError::NotFound("steam directory"))
 }

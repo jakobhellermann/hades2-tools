@@ -43,6 +43,13 @@ impl Hades2Installation {
         })
     }
 
+    pub fn active_profile_path(&self) -> Result<String> {
+        let active_profile = std::fs::read(self.save_dir().join("activeProfile"))?;
+        let active_profile = saves::parse_active_profile(&mut active_profile.as_slice())?;
+
+        Ok(active_profile.to_owned())
+    }
+
     pub fn save(&self, slot: u32) -> Result<SaveHandle> {
         let path = self.save_dir.join(format!("Profile{slot}.sav"));
         anyhow::ensure!(path.exists(), "save {slot} does not exist");

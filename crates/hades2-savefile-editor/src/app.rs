@@ -1,9 +1,10 @@
 use std::collections::hash_map::Entry;
+use std::ffi::OsStr;
 use std::fs::OpenOptions;
 use std::io::{BufWriter, Write};
 use std::time::Instant;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use egui::ahash::HashMap;
 use egui::{Align, Grid, Layout, ScrollArea, TextEdit};
 use hades2::saves::{LuaValue, Savefile};
@@ -33,7 +34,7 @@ struct State {
     hades: Option<Hades2Installation>,
     error: Option<String>,
 
-    saves: Vec<(SaveHandle, Result<Savefile>)>,
+    saves: Vec<(SaveHandle, Result<Savefile>, bool)>,
 }
 
 struct FilterState {
@@ -82,17 +83,26 @@ impl App {
             return Ok(());
         };
 
+        let active_profile = hades
+            .active_profile_path()
+            .context("failed to read active profile")?;
+
         let saves = hades.saves()?;
         self.state.saves = saves
             .into_iter()
             .map(|handle| {
                 let save = handle.read_header_only();
-                (handle, save)
+                let is_active = handle
+                    .path()
+                    .file_stem()
+                    .and_then(OsStr::to_str)
+                    .map_or(false, |stem| stem == active_profile);
+                (handle, save, is_active)
             })
             .collect::<Vec<_>>();
 
         if AUTOLOAD {
-            if let [.., (handle, _)] = self.state.saves.as_slice() {
+            if let [.., (handle, _, _)] = self.state.saves.as_slice() {
                 let (save, lua_state) = handle.read().unwrap();
                 self.current_savefile = Some(Box::new(CurrentSavefile {
                     filter: FilterState {
@@ -298,15 +308,21 @@ impl App {
             ui.label("Slot");
             ui.label("Runs");
             ui.label("Grasp");
+            ui.label("Active");
             ui.label("Last Modified");
             ui.end_row();
 
-            for (handle, save) in &self.state.saves {
+            for (handle, save, is_active) in &self.state.saves {
                 match save {
                     Ok(save) => {
                         ui.label(handle.slot().to_string());
                         ui.label((save.runs + 1).to_string());
                         ui.label(save.grasp.to_string());
+                        if *is_active {
+                            ui.label("✔");
+                        } else {
+                            ui.vertical(|_| ());
+                        }
 
                         ui.label(format_time(save.timestamp));
 

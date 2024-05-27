@@ -85,6 +85,21 @@ impl Savefile {
     }
 }
 
+pub(crate) fn parse_active_profile<'i>(data: &mut &'i [u8]) -> Result<&'i str> {
+    let signature = read_bytes_array::<4>(data)?;
+    if signature != MAGIC {
+        return Err(Error::SignatureMismatch);
+    }
+
+    let str = read_str_prefix(data)?;
+
+    if data.len() > 0 {
+        return Err(Error::UnexpectedAtEnd);
+    }
+
+    Ok(str)
+}
+
 fn parse_inner<'i>(data: &mut &'i [u8]) -> Result<(Savefile, &'i [u8])> {
     let signature = read_bytes_array::<4>(data)?;
     if signature != MAGIC {

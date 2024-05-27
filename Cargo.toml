@@ -3,5 +3,9 @@ resolver = "2"
 members = ["crates/*", "web/rust-bindings"]
 default-members = ["crates/hades2"]
 
+[workspace.package]
+repository = "https://github.com/jakobhellermann/hades2-tools"
+license = "MIT"
+
 [profile.dev.package."*"]
 opt-level = 2

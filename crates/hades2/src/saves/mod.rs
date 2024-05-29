@@ -21,7 +21,9 @@ pub(crate) fn save_dir(_steam_dir: &Path) -> Result<PathBuf, LocateError> {
 
 #[cfg(target_os = "macos")]
 pub(crate) fn save_dir(_steam_dir: &Path) -> Result<PathBuf, LocateError> {
-    todo!()
+    Err(LocateError::NotFound(
+        "macOS not supported yet. Please open an issue on github. save dir",
+    ))
 }
 
 #[cfg(target_os = "linux")]

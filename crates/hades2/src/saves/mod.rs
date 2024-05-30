@@ -213,8 +213,7 @@ mod test {
 
     use super::LZ4_MIN_DECOPMRESS_LEN;
 
-    // const EXAMPLE_PROFILE:&[u8] = include_bytes!("C:/Users/Jakob/Saved Games/Hades II/Profile1.sav").as_slice();
-    const EXAMPLE_PROFILE: &[u8] = include_bytes!("/home/jakob/.local/share/Steam/steamapps/compatdata/1145350/pfx/drive_c/users/steamuser/Saved Games/Hades II/Profile1.sav").as_slice();
+    const EXAMPLE_PROFILE: &[u8] = include_bytes!("../../../../testdata/Profile1.sav").as_slice();
 
     #[test]
     fn roundtrip_luabins() -> Result<()> {

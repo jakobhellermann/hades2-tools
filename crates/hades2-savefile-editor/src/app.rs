@@ -137,8 +137,11 @@ impl App {
                 .show(ctx, |ui| {
                     ui.heading("Save?");
 
-                    match save_dialog.backups {
-                        Some(ref backups) => {
+                    match save_dialog.backups.as_deref() {
+                        None | Some([]) => {
+                            ui.label("No backups found!");
+                        }
+                        Some(backups) => {
                             ui.label("Backups");
                             ui.indent("backups", |ui| {
                                 for (backup, timestamp) in backups {
@@ -164,15 +167,11 @@ impl App {
                                     }
                                 }
                             });
-
-                            ui.add_enabled_ui(false, |ui| {
-                                let _ = ui.button("Make backup");
-                            });
-                        }
-                        None => {
-                            ui.label("No backups found!");
                         }
                     };
+                    ui.add_enabled_ui(false, |ui| {
+                        let _ = ui.button("Make backup");
+                    });
 
                     ui.with_layout(Layout::bottom_up(Align::Min), |ui| {
                         ui.with_layout(Layout::right_to_left(Align::Max), |ui| {
@@ -660,7 +659,11 @@ fn valpath<T: egui::emath::Numeric>(
         .as_number_mut()
         .unwrap();
 
-    let changed = ui.add(egui::DragValue::new(number)).changed();
+    let mut edit = T::from_f64(*number);
+    let changed = ui.add(egui::DragValue::new(&mut edit)).changed();
+    if changed {
+        *number = T::to_f64(edit);
+    }
     ui.end_row();
 
     changed

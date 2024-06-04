@@ -17,14 +17,15 @@ impl Default for Pos {
 }
 
 impl Pos {
-    const MAX_INLINE_DEPTH: usize = 16;
+    const MAX_INLINE_DEPTH: usize = 15;
     const MAX_INLINE_CHILD: u16 = u8::MAX as u16;
 
     #[must_use]
     pub fn push(&self, val: u16) -> Pos {
         match *self {
             Pos::Inline(len, ref data) => {
-                let spill = len as usize == Self::MAX_INLINE_DEPTH || val > Self::MAX_INLINE_CHILD;
+                let spill =
+                    len as usize > Self::MAX_INLINE_DEPTH - 1 || val > Self::MAX_INLINE_CHILD;
 
                 if spill {
                     let mut new = Vec::with_capacity(len as usize + 1);

@@ -1,0 +1,38 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+    <Package Name="Hades II Savefile Editor" Manufacturer="JakobHellermann" Version="1.0.0.0"
+        UpgradeCode="bfca9048-2bb6-4e1d-8935-e01a761944f9">
+        <MediaTemplate EmbedCab="true" />
+        <MajorUpgrade
+            AllowSameVersionUpgrades="yes"
+            DowngradeErrorMessage="A newer version of [ProductName] is already installed. If you are sure you want to downgrade, remove the existing installation via the Control Panel" />
+        <Icon Id="icon.ico" SourceFile="crates/hades2-savefile-editor/assets/icon.ico" />
+
+        <!-- App icon in Add/Remove Programs-->
+        <Property Id="ARPPRODUCTICON" Value="icon.ico"></Property>
+
+        <StandardDirectory Id="ProgramFilesFolder">
+            <Directory Id="INSTALLFOLDER" Name="!(bind.Property.ProductName)" />
+        </StandardDirectory>
+
+        <Feature Id="Main">
+            <Component Directory="INSTALLFOLDER">
+                <File Source="target/release/hades2-savefile-editor.exe" KeyPath="true">
+                    <Shortcut Id="Shortcut"
+                        Name="Hades II Savefile Editor"
+                        Icon="icon.ico"
+                        Directory="StartMenuFolder"
+                        Advertise="true">
+                    </Shortcut>
+                </File>
+
+                <RegistryValue Root="HKLM" Key="SOFTWARE\Classes\HadesIISavefileEditor.Sav" Name="FriendlyTypeName" Value="hi" Type="string" />
+                <ProgId Id="HadesIISavefileEditor.Sav" Description="Hades II Savefile" Advertise="yes">
+                    <Extension Id="sav">
+                        <Verb Id="open" Command="Edit Savefile" Argument="&quot;%1&quot;" />
+                    </Extension>
+                </ProgId>
+
+            </Component>
+        </Feature>
+    </Package>
+</Wix>

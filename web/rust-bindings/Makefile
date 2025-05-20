@@ -4,7 +4,7 @@ out/hades.js: out/hades.wasm src/lib.rs
 
 
 out/hades.wasm: src/lib.rs Cargo.toml
-	cargo build -Zunstable-options --out-dir out --release
+	cargo build -Zunstable-options --artifact-dir out --release
 
 .PHONY: clean
 clean:

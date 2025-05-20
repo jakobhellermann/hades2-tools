@@ -220,7 +220,9 @@ impl Default for App {
             Ok(val) => (Some(val), None),
             Err(val) => (
                 None,
-                Some(format!("Could not detect Hades II installation: {val}\nPlease open an issue on github.")),
+                Some(format!(
+                    "Could not detect Hades II installation: {val}\nPlease open an issue on github."
+                )),
             ),
         };
         let mut app = Self {

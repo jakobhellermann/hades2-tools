@@ -37,6 +37,9 @@ impl<'a> LuaTable<'a> {
         &mut self.0[pos].1
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.0.len() == 0
+    }
     pub fn len(&self) -> usize {
         self.0.len()
     }
@@ -70,15 +73,15 @@ impl std::cmp::Ord for Value<'_> {
         match discriminant(self).cmp(&discriminant(other)) {
             std::cmp::Ordering::Equal => match (self, other) {
                 (Value::Nil, Value::Nil) => std::cmp::Ordering::Equal,
-                (Value::Bool(f0_self), Value::Bool(f0_other)) => f0_self.cmp(&f0_other),
-                (Value::Number(f0_self), Value::Number(f0_other)) => f0_self.total_cmp(&f0_other),
+                (Value::Bool(f0_self), Value::Bool(f0_other)) => f0_self.cmp(f0_other),
+                (Value::Number(f0_self), Value::Number(f0_other)) => f0_self.total_cmp(f0_other),
                 (Value::String(f0_self), Value::String(f0_other)) => {
                     let self_underscore = f0_self.starts_with('_');
                     let other_underscore = f0_other.starts_with('_');
 
                     other_underscore
                         .cmp(&self_underscore)
-                        .then_with(|| f0_self.cmp(&f0_other))
+                        .then_with(|| f0_self.cmp(f0_other))
                 }
                 (Value::Table(f0_self), Value::Table(f0_other)) => f0_self.0.cmp(&f0_other.0),
                 _ => std::cmp::Ordering::Equal,
@@ -92,8 +95,8 @@ impl<'a> std::fmt::Debug for Value<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Nil => write!(f, "Nil"),
-            Self::Bool(val) => write!(f, "{}", val),
-            Self::Number(val) => write!(f, "{}", val),
+            Self::Bool(val) => write!(f, "{val}"),
+            Self::Number(val) => write!(f, "{val}"),
             Self::String(val) => f.write_str(val),
             // Self::Table(val) => f.debug_tuple("Table").field(val).finish(),
             Self::Table(table) => {
@@ -125,7 +128,7 @@ impl<'l> Value<'l> {
 
     pub fn as_table(&self) -> Option<&LuaTable<'l>> {
         match self {
-            Value::Table(entries) => Some(&entries),
+            Value::Table(entries) => Some(entries),
             _ => None,
         }
     }
@@ -186,11 +189,11 @@ impl<'l> Value<'l> {
     }
 }
 
-pub fn read_luabins<'i>(data: &mut &'i [u8]) -> Result<Vec<Value<'static>>> {
+pub fn read_luabins(data: &mut &[u8]) -> Result<Vec<Value<'static>>> {
     let len = read_u8(data)?;
 
     if len > 250 {
-        return Err(Error::LuaError);
+        return Err(Error::Lua);
     }
 
     let mut values = Vec::with_capacity(len as usize);
@@ -199,14 +202,14 @@ pub fn read_luabins<'i>(data: &mut &'i [u8]) -> Result<Vec<Value<'static>>> {
         values.push(val);
     }
 
-    if data.len() > 0 {
+    if !data.is_empty() {
         return Err(Error::UnexpectedAtEnd);
     }
 
     Ok(values)
 }
 
-pub fn read_value<'i>(data: &mut &'i [u8]) -> Result<Value<'static>> {
+pub fn read_value(data: &mut &[u8]) -> Result<Value<'static>> {
     let ty = read_u8(data)?;
     let val = match ty {
         b'-' => Value::Nil,
@@ -239,7 +242,7 @@ pub fn read_value<'i>(data: &mut &'i [u8]) -> Result<Value<'static>> {
             table.sort();
             Value::Table(table)
         }
-        _ => return Err(Error::LuaError),
+        _ => return Err(Error::Lua),
     };
 
     /*let mut result = Vec::new();
@@ -382,7 +385,7 @@ pub mod write {
 
     pub fn write_luabins<'a>(
         result: &mut Vec<u8>,
-        data: impl Iterator<Item = &'a Value<'a>> + ExactSizeIterator,
+        data: impl ExactSizeIterator<Item = &'a Value<'a>>,
     ) {
         result.push(data.len() as u8);
         for datum in data {

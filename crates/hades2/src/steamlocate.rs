@@ -15,8 +15,8 @@ fn locate_steam_dir_helper() -> Result<PathBuf, LocateError> {
 
 #[cfg(target_os = "windows")]
 fn locate_steam_dir_helper() -> Result<PathBuf, LocateError> {
-    use winreg::enums::{HKEY_LOCAL_MACHINE, KEY_READ};
     use winreg::RegKey;
+    use winreg::enums::{HKEY_LOCAL_MACHINE, KEY_READ};
 
     let io_to_locate_err = |_io_err| LocateError::Other;
 
@@ -83,5 +83,5 @@ fn locate_steam_dir_helper() -> Result<PathBuf, LocateError> {
     steam_paths
         .into_iter()
         .find(|x| x.is_dir())
-        .ok_or_else(|| LocateError::NotFound("steam directory"))
+        .ok_or(LocateError::NotFound("steam directory"))
 }

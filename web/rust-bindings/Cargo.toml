@@ -1,7 +1,7 @@
 [package]
 name = "hades2-bindings"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 hades2 = { path = "../../crates/hades2", features = ["serde"] }

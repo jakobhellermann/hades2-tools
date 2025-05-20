@@ -72,10 +72,10 @@ impl Hades2Installation {
     fn saves_inner(&self, f: impl Fn(&SaveHandle) -> bool) -> Result<Vec<SaveHandle>> {
         let mut saves = Vec::new();
         for save in self.save_dir.read_dir()? {
-            if let Some(handle) = SaveHandle::from_path(save?.path()) {
-                if f(&handle) {
-                    saves.push(handle);
-                }
+            if let Some(handle) = SaveHandle::from_path(save?.path())
+                && f(&handle)
+            {
+                saves.push(handle);
             }
         }
 

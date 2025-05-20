@@ -7,11 +7,11 @@ pub enum Error {
     #[error("File does not begin with correct signature")]
     SignatureMismatch,
     #[error("File was corrupted (invalid checksum)")]
-    ChecksumError,
+    Checksum,
     #[error("Savefile version is {0}, only 17 is supported")]
     UnsupportedVersion(u32),
     #[error("Unexpected end of savefile while reading data")]
-    EOF,
+    Eof,
     #[error("found unexpected bytes at end")]
     UnexpectedAtEnd,
     #[error("could not decode utf-8")]
@@ -20,12 +20,12 @@ pub enum Error {
     LZ4(#[from] lz4_flex::block::DecompressError),
 
     #[error("unexpected lua state")]
-    LuaError,
+    Lua,
 }
 
 pub fn read_bytes_array<const N: usize>(data: &mut &[u8]) -> Result<[u8; N]> {
     if data.len() < N {
-        return Err(Error::EOF);
+        return Err(Error::Eof);
     }
 
     let (bytes, rest) = data.split_at(N);
@@ -34,7 +34,7 @@ pub fn read_bytes_array<const N: usize>(data: &mut &[u8]) -> Result<[u8; N]> {
 }
 pub fn read_bytes<'i>(data: &mut &'i [u8], n: usize) -> Result<&'i [u8]> {
     if data.len() < n {
-        return Err(Error::EOF);
+        return Err(Error::Eof);
     }
 
     let (bytes, rest) = data.split_at(n);
@@ -43,7 +43,7 @@ pub fn read_bytes<'i>(data: &mut &'i [u8], n: usize) -> Result<&'i [u8]> {
 }
 
 pub fn read_u8(data: &mut &[u8]) -> Result<u8> {
-    let (first, rest) = data.split_first().ok_or(Error::EOF)?;
+    let (first, rest) = data.split_first().ok_or(Error::Eof)?;
     *data = rest;
     Ok(*first)
 }

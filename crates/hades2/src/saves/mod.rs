@@ -37,8 +37,8 @@ pub(crate) fn save_dir(steam_dir: &Path) -> Result<PathBuf, LocateError> {
     Ok(dir)
 }
 
-pub use crate::parser::luabins::{LuaTable, Value as LuaValue};
 pub use crate::parser::Result;
+pub use crate::parser::luabins::{LuaTable, Value as LuaValue};
 use crate::parser::*;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -66,12 +66,12 @@ impl Savefile {
 
         let lua_state = luabins::read_luabins(&mut lua_state.as_slice())?;
         if lua_state.len() != 1 {
-            return Err(Error::LuaError);
+            return Err(Error::Lua);
         }
         let lua_state = lua_state.into_iter().next().unwrap();
 
         if computed_checksum != savefile.checksum {
-            return Err(Error::ChecksumError);
+            return Err(Error::Checksum);
         }
 
         Ok((savefile, lua_state))
@@ -91,7 +91,7 @@ pub(crate) fn parse_active_profile<'i>(data: &mut &'i [u8]) -> Result<&'i str> {
 
     let str = read_str_prefix(data)?;
 
-    if data.len() > 0 {
+    if !data.is_empty() {
         return Err(Error::UnexpectedAtEnd);
     }
 
@@ -128,7 +128,7 @@ fn parse_inner<'i>(data: &mut &'i [u8]) -> Result<(Savefile, &'i [u8])> {
 
     let lua_state = read_bytes(data, length as usize)?;
 
-    if data.len() > 0 {
+    if !data.is_empty() {
         return Err(Error::UnexpectedAtEnd);
     }
 

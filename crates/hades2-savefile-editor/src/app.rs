@@ -6,7 +6,7 @@ use std::time::Instant;
 
 use anyhow::{Context, Result};
 use egui::ahash::HashMap;
-use egui::{Align, Grid, Layout, ScrollArea, TextEdit};
+use egui::{Align, Grid, Layout, ScrollArea, TextEdit, UiBuilder};
 use hades2::saves::{LuaValue, Savefile};
 use hades2::{Hades2Installation, SaveHandle};
 
@@ -458,33 +458,36 @@ impl App {
             });
         }
 
-        ui.allocate_ui_at_rect(rect_full.shrink2([8., 0.].into()), |ui| {
-            ui.with_layout(Layout::top_down(Align::Max), |ui| {
-                ui.checkbox(&mut self.advanced_mode, "Advanced Mode");
+        ui.allocate_new_ui(
+            UiBuilder::new().max_rect(rect_full.shrink2([8., 0.].into())),
+            |ui| {
+                ui.with_layout(Layout::top_down(Align::Max), |ui| {
+                    ui.checkbox(&mut self.advanced_mode, "Advanced Mode");
 
-                if self.advanced_mode {
-                    ui.horizontal(|ui| {
-                        let res = TextEdit::singleline(&mut filter.filter)
-                            .hint_text("^resources")
-                            .desired_width(80.)
-                            .show(ui)
-                            .response;
-                        filter.filter_changed |= res.changed();
-                        if ui.input_mut(|input| {
-                            input.consume_key(egui::Modifiers::CTRL, egui::Key::F)
-                        }) {
-                            res.request_focus();
-                        }
-                        ui.label("Filter");
-                    });
+                    if self.advanced_mode {
+                        ui.horizontal(|ui| {
+                            let res = TextEdit::singleline(&mut filter.filter)
+                                .hint_text("^resources")
+                                .desired_width(80.)
+                                .show(ui)
+                                .response;
+                            filter.filter_changed |= res.changed();
+                            if ui.input_mut(|input| {
+                                input.consume_key(egui::Modifiers::CTRL, egui::Key::F)
+                            }) {
+                                res.request_focus();
+                            }
+                            ui.label("Filter");
+                        });
 
-                    ui.horizontal(|ui| {
-                        ui.checkbox(&mut filter.search_values, "");
-                        ui.label("Search in values");
-                    });
-                }
-            });
-        });
+                        ui.horizontal(|ui| {
+                            ui.checkbox(&mut filter.search_values, "");
+                            ui.label("Search in values");
+                        });
+                    }
+                });
+            },
+        );
 
         ui.with_layout(Layout::bottom_up(Align::LEFT), |ui| {
             ui.horizontal(|ui| {

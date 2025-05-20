@@ -10,12 +10,13 @@ hades2 = { version = "0.1", path = "../hades2" }
 time = "0.3"
 
 serde = { version = "1", features = ["derive"] }
-egui = "0.27"
+egui = "0.31"
 catppuccin-egui = { version = "5.1", default-features = false, features = [
-    "egui27",
+    "egui31",
 ] }
-eframe = { version = "0.27", default-features = false, features = [
+eframe = { version = "0.31", default-features = false, features = [
     "default_fonts",
     "glow",
     "persistence",
+    "x11", "wayland"
 ] }

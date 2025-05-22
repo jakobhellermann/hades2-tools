@@ -1,5 +1,5 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
-    <Package Name="Hades II Savefile Editor" Manufacturer="JakobHellermann" Version="1.0.0.0"
+    <Package Name="Hades II Savefile Editor" Manufacturer="JakobHellermann" Version="1.0.1.0"
         UpgradeCode="bfca9048-2bb6-4e1d-8935-e01a761944f9">
         <MediaTemplate EmbedCab="true" />
         <MajorUpgrade

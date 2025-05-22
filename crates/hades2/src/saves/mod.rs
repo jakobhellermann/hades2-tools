@@ -106,9 +106,10 @@ fn parse_inner<'i>(data: &mut &'i [u8]) -> Result<(Savefile, &'i [u8])> {
 
     let checksum = read_u32(data)?;
 
-    let version = read_u32(data)?;
+    let version = read_u16(data)?;
+    let _unknown = read_u16(data)?;
     if version != 17 {
-        return Err(Error::UnsupportedVersion(version));
+        return Err(Error::UnsupportedVersion(version as u32));
     }
     let timestamp = read_u64(data)?;
     let location = read_str_prefix(data)?;

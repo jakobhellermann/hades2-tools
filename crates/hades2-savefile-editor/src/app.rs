@@ -170,7 +170,9 @@ impl App {
                         }
                     };
                     ui.add_enabled_ui(false, |ui| {
-                        let _ = ui.button("Make backup");
+                        let _ = ui.button("Make backup").on_disabled_hover_text(
+                            "Not implemented yet. You have to make manual backups.",
+                        );
                     });
 
                     ui.with_layout(Layout::bottom_up(Align::Min), |ui| {
@@ -313,6 +315,7 @@ impl App {
             ui.label("Runs");
             ui.label("Grasp");
             ui.label("Active");
+            ui.label("Version");
             ui.label("Last Modified");
             ui.end_row();
 
@@ -328,6 +331,7 @@ impl App {
                             ui.vertical(|_| ());
                         }
 
+                        ui.label(save.version.to_string());
                         ui.label(format_time(save.timestamp));
 
                         if ui.button("Open").clicked() {

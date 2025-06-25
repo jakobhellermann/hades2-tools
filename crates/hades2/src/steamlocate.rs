@@ -46,7 +46,7 @@ fn locate_steam_dir_helper() -> Result<PathBuf, LocateError> {
 fn locate_steam_dir_helper() -> Result<PathBuf, LocateError> {
     // Steam's installation location is pretty easy to find on macOS, as it's always in
     // $USER/Library/Application Support
-    let home_dir = dirs::home_dir().ok_or_else(|| LocateError::Other)?;
+    let home_dir = std::env::home_dir().ok_or_else(|| LocateError::Other)?;
 
     // Find Library/Application Support/Steam
     let install_path = home_dir.join("Library/Application Support/Steam");
@@ -58,7 +58,7 @@ fn locate_steam_dir_helper() -> Result<PathBuf, LocateError> {
     use std::env;
 
     // Steam's installation location is pretty easy to find on Linux, too, thanks to the symlink in $USER
-    let home_dir = dirs::home_dir().ok_or(LocateError::Other)?;
+    let home_dir = std::env::home_dir().ok_or(LocateError::Other)?;
     let snap_dir = match env::var("SNAP_USER_DATA") {
         Ok(snap_dir) => PathBuf::from(snap_dir),
         Err(_) => home_dir.join("snap"),

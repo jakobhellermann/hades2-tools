@@ -11,7 +11,7 @@ pub(crate) fn save_dir(_steam_dir: &Path) -> Result<PathBuf, LocateError> {
 
 #[cfg(target_os = "windows")]
 pub(crate) fn save_dir(_steam_dir: &Path) -> Result<PathBuf, LocateError> {
-    let home_dir = dirs::home_dir().ok_or_else(|| LocateError::Other)?;
+    let home_dir = std::env::home_dir().ok_or_else(|| LocateError::Other)?;
     let dir = home_dir.join("Saved Games/Hades II");
     if !dir.exists() {
         return Err(LocateError::NotFound("`~/Saved Games/Hades II`"));

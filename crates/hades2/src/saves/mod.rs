@@ -243,6 +243,21 @@ mod test {
         roundtrip_reparse_savefile(TEST_PROFILE_V17)
     }
 
+    const TEST_PROFILE_V18: &[u8] =
+        include_bytes!("../../../../testdata/Profile.v18.sav").as_slice();
+    #[test]
+    fn roundtrip_luabins_18() -> Result<()> {
+        roundtrip_luabins(TEST_PROFILE_V18)
+    }
+    #[test]
+    fn roundtrip_savefile_18() -> Result<()> {
+        roundtrip_savefile(TEST_PROFILE_V18)
+    }
+    #[test]
+    fn roundtrip_reparse_savefile_18() -> Result<()> {
+        roundtrip_reparse_savefile(TEST_PROFILE_V18)
+    }
+
     fn roundtrip_luabins(data: &[u8]) -> Result<()> {
         let (_, lua_state) = super::parse_inner(&mut &*data)?;
         let lua_state_bytes = lz4_flex::block::decompress(lua_state, LZ4_MIN_DECOPMRESS_LEN)?;

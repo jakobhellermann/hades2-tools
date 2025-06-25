@@ -24,3 +24,6 @@ winreg = "0.55"
 
 [lints.clippy]
 single_element_loop = "allow"
+
+[dev-dependencies]
+pretty_assertions = "1.4.1"

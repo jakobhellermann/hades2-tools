@@ -223,25 +223,39 @@ fn serialize_inner<W: std::io::Write>(
 #[allow(const_item_mutation)]
 mod test {
     use anyhow::Result;
+    use pretty_assertions::assert_eq;
 
     use super::LZ4_MIN_DECOPMRESS_LEN;
 
-    const EXAMPLE_PROFILE: &[u8] = include_bytes!("../../../../testdata/Profile1.sav").as_slice();
+    const TEST_PROFILE_V17: &[u8] =
+        include_bytes!("../../../../testdata/Profile.v17.sav").as_slice();
 
     #[test]
-    fn roundtrip_luabins() -> Result<()> {
-        let (_, lua_state) = super::parse_inner(&mut EXAMPLE_PROFILE)?;
+    fn roundtrip_luabins_17() -> Result<()> {
+        roundtrip_luabins(TEST_PROFILE_V17)
+    }
+    #[test]
+    fn roundtrip_savefile_17() -> Result<()> {
+        roundtrip_savefile(TEST_PROFILE_V17)
+    }
+    #[test]
+    fn roundtrip_reparse_savefile_17() -> Result<()> {
+        roundtrip_reparse_savefile(TEST_PROFILE_V17)
+    }
+
+    fn roundtrip_luabins(data: &[u8]) -> Result<()> {
+        let (_, lua_state) = super::parse_inner(&mut &*data)?;
         let lua_state_bytes = lz4_flex::block::decompress(lua_state, LZ4_MIN_DECOPMRESS_LEN)?;
         let lua_state = super::luabins::read_luabins(&mut lua_state_bytes.as_slice())?;
 
-        /*for val in &lua_state {
+        for val in &lua_state {
             val.visit(true, &mut |val| {
                 let mut result = Vec::new();
                 super::luabins::write::save_value(&mut result, val);
                 let reparsed = super::luabins::read_value(&mut result.as_slice()).unwrap();
                 assert_eq!(*val, reparsed);
             });
-        }*/
+        }
 
         let mut lua_state_bytes_again = Vec::new();
         super::luabins::write_luabins(&mut lua_state_bytes_again, lua_state.iter());
@@ -251,21 +265,19 @@ mod test {
         Ok(())
     }
 
-    #[test]
-    fn roundtrip_savefile() -> Result<()> {
-        let (savefile, lua_state_compressed) = super::parse_inner(&mut EXAMPLE_PROFILE)?;
+    fn roundtrip_savefile(data: &[u8]) -> Result<()> {
+        let (savefile, lua_state_compressed) = super::parse_inner(&mut &*data)?;
 
         let mut out = Vec::new();
         super::serialize_inner(&mut out, &savefile, lua_state_compressed)?;
 
-        assert!(out.as_slice() == EXAMPLE_PROFILE);
+        assert_eq!(out.as_slice(), data);
 
         Ok(())
     }
 
-    #[test]
-    fn roundtrip_reparse_savefile() -> Result<()> {
-        let (mut savefile, lua_state) = super::Savefile::parse(EXAMPLE_PROFILE)?;
+    fn roundtrip_reparse_savefile(data: &[u8]) -> Result<()> {
+        let (mut savefile, lua_state) = super::Savefile::parse(&mut &*data)?;
 
         let mut out = Vec::new();
         savefile.serialize(&mut out, &lua_state)?;

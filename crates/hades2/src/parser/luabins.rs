@@ -363,7 +363,7 @@ pub mod write {
         }
     }
 
-    fn save_value(result: &mut Vec<u8>, value: &Value) {
+    pub(crate) fn save_value(result: &mut Vec<u8>, value: &Value) {
         match value {
             Value::Nil => result.push(b'-'),
             Value::Bool(inner) => match *inner {

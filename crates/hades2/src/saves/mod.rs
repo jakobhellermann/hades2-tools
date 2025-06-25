@@ -44,6 +44,7 @@ use crate::parser::*;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Savefile {
     pub version: u16,
+    pub version_unk: u16, // on this file https://github.com/jakobhellermann/hades2-tools/issues/1 the second u16 has value 1
     pub location: String,
     pub checksum: u32,
     pub timestamp: u64,
@@ -109,7 +110,7 @@ fn parse_inner<'i>(data: &mut &'i [u8]) -> Result<(Savefile, &'i [u8])> {
     let checksum = read_u32(data)?;
 
     let version = read_u16(data)?;
-    let _unknown = read_u16(data)?;
+    let version_unk = read_u16(data)?;
     if !(17..=18).contains(&version) {
         return Err(Error::UnsupportedVersion(version as u32));
     }
@@ -143,6 +144,7 @@ fn parse_inner<'i>(data: &mut &'i [u8]) -> Result<(Savefile, &'i [u8])> {
     Ok((
         Savefile {
             version,
+            version_unk,
             checksum,
             location: location.to_owned(),
             timestamp,
@@ -182,8 +184,8 @@ fn serialize_inner<W: std::io::Write>(
 ) -> std::io::Result<()> {
     let mut header = Vec::new();
 
-    let version = savefile.version;
-    header.extend_from_slice(&u32::to_le_bytes(version as u32));
+    header.extend_from_slice(&u16::to_le_bytes(savefile.version));
+    header.extend_from_slice(&u16::to_le_bytes(savefile.version_unk));
     header.extend_from_slice(&u64::to_le_bytes(savefile.timestamp));
     header.extend_from_slice(&u32::to_le_bytes(savefile.location.len() as u32));
     header.extend_from_slice(savefile.location.as_bytes());
@@ -256,6 +258,13 @@ mod test {
     #[test]
     fn roundtrip_reparse_savefile_18() -> Result<()> {
         roundtrip_reparse_savefile(TEST_PROFILE_V18)
+    }
+
+    const TEST_REGRESSION_SPLITVERSION: &[u8] =
+        include_bytes!("../../../../testdata/regression/1.sav").as_slice();
+    #[test]
+    fn roundtrip_savefile_splitversion() -> Result<()> {
+        roundtrip_reparse_savefile(TEST_REGRESSION_SPLITVERSION)
     }
 
     fn roundtrip_luabins(data: &[u8]) -> Result<()> {

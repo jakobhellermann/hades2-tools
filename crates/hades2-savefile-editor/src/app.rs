@@ -208,10 +208,10 @@ impl CurrentSavefile {
             OpenOptions::new()
                 .write(true)
                 .create(false)
+                .truncate(true)
                 .open(self.handle.path())?,
         );
         file.write_all(&out)?;
-        // self.save.serialize(out, &self.lua_state)?;
         Ok(())
     }
 }

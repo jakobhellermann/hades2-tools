@@ -8,7 +8,7 @@ pub enum Error {
     SignatureMismatch,
     #[error("File was corrupted (invalid checksum)")]
     Checksum,
-    #[error("Savefile version is {0}, only 17 is supported")]
+    #[error("Savefile version is {0}, only 17 or 18 are supported")]
     UnsupportedVersion(u32),
     #[error("Unexpected end of savefile while reading data")]
     Eof,

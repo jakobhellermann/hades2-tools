@@ -43,6 +43,7 @@ use crate::parser::*;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Savefile {
+    pub version: u16,
     pub location: String,
     pub checksum: u32,
     pub timestamp: u64,
@@ -52,6 +53,7 @@ pub struct Savefile {
     pub grasp: u32,
     pub easy_mode: bool,
     pub hard_mode: bool,
+    pub unknown_v18: u32,
     pub lua_keys: Vec<String>,
     pub current_map_name: String,
     pub start_next_map: String,
@@ -108,7 +110,7 @@ fn parse_inner<'i>(data: &mut &'i [u8]) -> Result<(Savefile, &'i [u8])> {
 
     let version = read_u16(data)?;
     let _unknown = read_u16(data)?;
-    if version != 17 {
+    if !(17..=18).contains(&version) {
         return Err(Error::UnsupportedVersion(version as u32));
     }
     let timestamp = read_u64(data)?;
@@ -119,6 +121,11 @@ fn parse_inner<'i>(data: &mut &'i [u8]) -> Result<(Savefile, &'i [u8])> {
     let grasp = read_u32(data)?;
     let easy_mode = read_bool(data)?;
     let hard_mode = read_bool(data)?;
+
+    let mut unknown_v18 = 0;
+    if version >= 18 {
+        unknown_v18 = read_u32(data)?;
+    }
 
     let lua_keys = read_array(data, |data| read_str_prefix(data).map(ToOwned::to_owned))?;
 
@@ -135,6 +142,7 @@ fn parse_inner<'i>(data: &mut &'i [u8]) -> Result<(Savefile, &'i [u8])> {
 
     Ok((
         Savefile {
+            version,
             checksum,
             location: location.to_owned(),
             timestamp,
@@ -144,6 +152,7 @@ fn parse_inner<'i>(data: &mut &'i [u8]) -> Result<(Savefile, &'i [u8])> {
             grasp,
             easy_mode,
             hard_mode,
+            unknown_v18,
             lua_keys,
             current_map_name: current_map_name.to_owned(),
             start_next_map: start_next_map.to_owned(),
@@ -173,8 +182,8 @@ fn serialize_inner<W: std::io::Write>(
 ) -> std::io::Result<()> {
     let mut header = Vec::new();
 
-    let version = 17;
-    header.extend_from_slice(&u32::to_le_bytes(version));
+    let version = savefile.version;
+    header.extend_from_slice(&u32::to_le_bytes(version as u32));
     header.extend_from_slice(&u64::to_le_bytes(savefile.timestamp));
     header.extend_from_slice(&u32::to_le_bytes(savefile.location.len() as u32));
     header.extend_from_slice(savefile.location.as_bytes());
@@ -184,6 +193,9 @@ fn serialize_inner<W: std::io::Write>(
     header.extend_from_slice(&u32::to_le_bytes(savefile.grasp));
     header.push(savefile.easy_mode as u8);
     header.push(savefile.hard_mode as u8);
+    if savefile.version >= 18 {
+        header.extend_from_slice(&u32::to_le_bytes(savefile.unknown_v18));
+    }
     header.extend_from_slice(&u32::to_le_bytes(savefile.lua_keys.len() as u32));
     for key in &savefile.lua_keys {
         header.extend_from_slice(&u32::to_le_bytes(key.len() as u32));
